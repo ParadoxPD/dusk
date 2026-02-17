@@ -9,6 +9,7 @@
 - `dusk git graph [theme]`
 - `dusk git log [theme]`
 - `dusk git status|viz [theme]`
+- `dusk git tui|interactive [theme]`
 - `dusk diff [theme] [--staged]`
 - `dusk themes list`
 - `dusk tree [args...]`
@@ -160,6 +161,31 @@ Shows branch + split panels for:
 
 ### `dusk git viz [theme]`
 Alias of `status`.
+
+### `dusk git tui [theme]`
+Interactive Git TUI panel with vim-style navigation and command mode.
+
+Key workflows:
+- Stage/unstage selected files (including untracked)
+- Stage all / unstage all
+- Enter commit message and commit directly
+- Push current branch (`origin/<branch>`)
+- Create branch and switch branch
+- Integrated status + log graph + selected-file diff panes
+- Built-in help overlay and `:` command mode help
+
+Primary keys:
+- `j/k`, `Up/Down`: move selection
+- `g/G`: first/last item
+- `h/l`, `Left/Right`, `Tab`: switch panes
+- `s/u`: stage/unstage selected file
+- `A/U`: stage all / unstage all
+- `c`: commit message input
+- `p`: push current branch
+- `b/B`: create branch / switch branch
+- `:`: command mode
+- `?`: in-app help
+- `q`: quit
 
 ## `diff` Subcommand
 

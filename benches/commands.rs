@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::process::Stdio;
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use tempfile::tempdir;
 
 fn bench_bin() -> PathBuf {

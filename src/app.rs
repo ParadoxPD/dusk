@@ -72,78 +72,111 @@ fn print_help() {
     let arg = |s: &str| style.paint(theme.ok, s);
     let desc = |s: &str| style.paint(theme.info, s);
     println!(
-        "{}\n\n{} {}\n  {} {} {}        {}\n  {} {} {}          {}\n  {} {} {}         {}\n  {} {} {}         {}\n  {} {} {}       {}\n  {} {} {}    {}\n  {} {} {}  {}\n  {} {} {} {}\n  {} {} {} {}\n  {} {} {}           {}\n\n{} {}\n  {} {} {}              {}\n  {} {} {}                {}\n\n{}\n  {} {} {}\n  {} {} {}\n  {} {} {}\n  {} {} {}\n  {} {} {}\n  {} {} {}\n",
-        cmd("dusk: one terminal tool for tree/find/grep/ls/cat + git visualization"),
-        opt(icons::ICON_TREE),
-        cmd("Native commands"),
+        "{}",
+        cmd("dusk: one terminal tool for tree/find/grep/ls/cat + git visualization")
+    );
+    println!();
+    println!("{} {}", opt(icons::ICON_TREE), cmd("Native commands"));
+    println!(
+        "  {} {} {}        {}",
         opt("dusk"),
         cmd("tree"),
         arg("[args...]"),
-        desc("# Rust tree implementation (xtree engine)"),
+        desc("# Rust tree implementation (xtree engine)")
+    );
+    println!(
+        "  {} {} {}          {}",
         opt("dusk"),
         cmd("ls"),
         arg("[args...]"),
-        desc("# Rust eza-style listing"),
+        desc("# Rust eza-style listing")
+    );
+    println!(
+        "  {} {} {}         {}",
         opt("dusk"),
         cmd("cat"),
         arg("[args...]"),
-        desc("# Plain cat-compatible behavior"),
+        desc("# Plain cat-compatible behavior")
+    );
+    println!(
+        "  {} {} {}         {}",
         opt("dusk"),
         cmd("bat"),
         arg("[args...]"),
-        desc("# Pretty themed file viewer"),
+        desc("# Pretty themed file viewer")
+    );
+    println!(
+        "  {} {} {}       {}",
         opt("dusk"),
         cmd("xtree"),
         arg("[args...]"),
-        desc("# Extended tree/analyzer mode"),
+        desc("# Extended tree/analyzer mode")
+    );
+    println!(
+        "  {} {} {}    {}",
         opt("dusk"),
         cmd("git log"),
         arg("[theme]"),
-        desc("# Informative git history graph"),
+        desc("# Informative git history graph")
+    );
+    println!(
+        "  {} {} {}  {}",
         opt("dusk"),
         cmd("git graph"),
         arg("[theme]"),
-        desc("# Alias of git log"),
+        desc("# Alias of git log")
+    );
+    println!(
+        "  {} {} {} {}",
         opt("dusk"),
         cmd("git status"),
         arg("[theme]"),
-        desc("# Staged/modified/untracked panel"),
+        desc("# Staged/modified/untracked panel")
+    );
+    println!(
+        "  {} {} {}    {}",
+        opt("dusk"),
+        cmd("git tui"),
+        arg("[theme]"),
+        desc("# Interactive git panel (vim-style keys)")
+    );
+    println!(
+        "  {} {} {} {}",
         opt("dusk"),
         cmd("diff"),
         arg("[theme] [--staged]"),
-        desc("# Side-by-side git diff with line numbers"),
+        desc("# Side-by-side git diff with line numbers")
+    );
+    println!(
+        "  {} {} {}           {}",
         opt("dusk"),
         cmd("themes"),
         arg("list"),
-        desc("# Theme catalog"),
-        opt(icons::ICON_GIT),
-        cmd("Pass-through"),
+        desc("# Theme catalog")
+    );
+    println!();
+    println!("{} {}", opt(icons::ICON_GIT), cmd("Pass-through"));
+    println!(
+        "  {} {} {}              {}",
         opt("dusk"),
         cmd("find"),
         arg("[args...]"),
-        desc("# System find"),
+        desc("# System find")
+    );
+    println!(
+        "  {} {} {}                {}",
         opt("dusk"),
         cmd("rg"),
         arg("[args...]"),
-        desc("# rg, or grep fallback if rg is missing"),
-        cmd("Quick start"),
-        opt("dusk"),
-        cmd("xtree"),
-        arg("--tldr"),
-        opt("dusk"),
-        cmd("xtree"),
-        arg("--help"),
-        opt("dusk"),
-        cmd("ls"),
-        arg("-laht"),
-        opt("dusk"),
-        cmd("cat"),
-        arg("src/main.rs"),
-        opt("dusk"),
-        cmd("bat"),
-        arg("src/main.rs"),
-        opt("dusk"),
-        cmd("git log"),
-        arg(""),
+        desc("# rg, or grep fallback if rg is missing")
     );
+    println!();
+    println!("{}", cmd("Quick start"));
+    println!("  {} {} {}", opt("dusk"), cmd("xtree"), arg("--tldr"));
+    println!("  {} {} {}", opt("dusk"), cmd("xtree"), arg("--help"));
+    println!("  {} {} {}", opt("dusk"), cmd("ls"), arg("-laht"));
+    println!("  {} {} {}", opt("dusk"), cmd("cat"), arg("src/main.rs"));
+    println!("  {} {} {}", opt("dusk"), cmd("bat"), arg("src/main.rs"));
+    println!("  {} {} {}", opt("dusk"), cmd("git log"), arg(""));
+    println!("  {} {} {}", opt("dusk"), cmd("git tui"), arg(""));
 }

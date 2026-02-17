@@ -6,11 +6,13 @@ edition = "2024"
 [dependencies]
 atty = "0.2.14"
 chrono = "0.4.42"
+crossterm = "0.29.0"
 globset = "0.4.16"
 ignore = "0.4.25"
 libc = "0.2.182"
 md5 = "0.8.0"
 serde_json = "1.0.145"
+unicode-width = "0.2.2"
 walkdir = "2.5.0"
 
 [dev-dependencies]
