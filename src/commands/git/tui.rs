@@ -26,6 +26,13 @@ enum Pane {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
+enum Tab {
+    Workspace,
+    Graph,
+    CommitDiff,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum InputMode {
     None,
     Commit,
@@ -101,6 +108,7 @@ struct App {
     theme: Theme,
     style: Style,
     pane: Pane,
+    tab: Tab,
     input_mode: InputMode,
     input: String,
     overlay: Option<Overlay>,
@@ -111,7 +119,11 @@ struct App {
     files: Vec<FileStatus>,
     selected: usize,
     log_lines: Vec<String>,
+    log_commits: Vec<Option<String>>,
+    log_selected: usize,
     diff_lines: Vec<String>,
+    commit_diff_lines: Vec<String>,
+    commit_diff_scroll: usize,
 }
 
 struct TerminalGuard;
@@ -170,6 +182,7 @@ impl App {
             theme,
             style,
             pane: Pane::Files,
+            tab: Tab::Workspace,
             input_mode: InputMode::None,
             input: String::new(),
             overlay: None,
@@ -180,7 +193,13 @@ impl App {
             files: Vec::new(),
             selected: 0,
             log_lines: Vec::new(),
+            log_commits: Vec::new(),
+            log_selected: 0,
             diff_lines: Vec::new(),
+            commit_diff_lines: vec![
+                "Select a commit in Graph tab (j/k), then open CommitDiff tab".to_string(),
+            ],
+            commit_diff_scroll: 0,
         }
     }
 
@@ -209,8 +228,17 @@ impl App {
         .lines()
         .map(ToString::to_string)
         .collect();
+        self.log_commits = self
+            .log_lines
+            .iter()
+            .map(|l| parse_commit_hash(l))
+            .collect();
+        if self.log_selected >= self.log_lines.len() {
+            self.log_selected = self.log_lines.len().saturating_sub(1);
+        }
 
         self.refresh_diff();
+        self.refresh_commit_diff();
         Ok(())
     }
 
@@ -248,26 +276,36 @@ impl App {
             return self.handle_input_key(key);
         }
 
-        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('p') {
+        if (key.modifiers.contains(KeyModifiers::CONTROL)
+            && matches!(key.code, KeyCode::Char('p') | KeyCode::Char('P')))
+            || matches!(key.code, KeyCode::Char('\u{10}'))
+        {
             self.open_palette();
             return Ok(false);
         }
 
         match key.code {
-            KeyCode::Char('q') => return Ok(true),
+            KeyCode::Char('q') if key.modifiers.is_empty() => return Ok(true),
             KeyCode::Char('?') => self.overlay = Some(Overlay::Help),
             KeyCode::Char('P') => self.open_palette(),
+            KeyCode::Char('1') => self.tab = Tab::Workspace,
+            KeyCode::Char('2') => self.tab = Tab::Graph,
+            KeyCode::Char('3') => self.tab = Tab::CommitDiff,
             KeyCode::Char('r') => {
                 self.refresh()?;
                 self.status_msg = "Refreshed".to_string();
             }
             KeyCode::Char('t') => self.cycle_theme(),
-            KeyCode::Char('h') | KeyCode::Left => self.pane = prev_pane(self.pane),
-            KeyCode::Char('l') | KeyCode::Right | KeyCode::Tab => self.pane = next_pane(self.pane),
-            KeyCode::Char('j') | KeyCode::Down => self.move_down(),
-            KeyCode::Char('k') | KeyCode::Up => self.move_up(),
-            KeyCode::Char('g') => self.selected = 0,
-            KeyCode::Char('G') => self.selected = self.files.len().saturating_sub(1),
+            KeyCode::Char('h') | KeyCode::Left if self.tab == Tab::Workspace => {
+                self.pane = prev_pane(self.pane)
+            }
+            KeyCode::Char('l') | KeyCode::Right | KeyCode::Tab if self.tab == Tab::Workspace => {
+                self.pane = next_pane(self.pane)
+            }
+            KeyCode::Char('j') | KeyCode::Down => self.move_down_active(),
+            KeyCode::Char('k') | KeyCode::Up => self.move_up_active(),
+            KeyCode::Char('g') => self.move_home_active(),
+            KeyCode::Char('G') => self.move_end_active(),
             KeyCode::Char('s') => self.stage_selected()?,
             KeyCode::Char('u') => self.unstage_selected()?,
             KeyCode::Char('A') => self.stage_all()?,
@@ -307,6 +345,7 @@ impl App {
                 | KeyCode::Char('r')
         ) {
             self.refresh_diff();
+            self.refresh_commit_diff();
         }
 
         Ok(false)
@@ -423,6 +462,9 @@ impl App {
                 self.overlay = Some(Overlay::Help);
                 self.status_msg = "Help opened".to_string();
             }
+            "cmdhelp" | "commands" => {
+                self.status_msg = command_mode_help();
+            }
             "refresh" | "r" => {
                 self.refresh()?;
                 self.status_msg = "Refreshed".to_string();
@@ -470,7 +512,20 @@ impl App {
             }
             "status" => {
                 self.pane = Pane::Files;
+                self.tab = Tab::Workspace;
                 self.status_msg = "Focused status pane".to_string();
+            }
+            "workspace" => {
+                self.tab = Tab::Workspace;
+                self.status_msg = "Switched to Workspace tab".to_string();
+            }
+            "graph-tab" | "graphview" => {
+                self.tab = Tab::Graph;
+                self.status_msg = "Switched to Graph tab".to_string();
+            }
+            "commitdiff" | "commit-diff" => {
+                self.tab = Tab::CommitDiff;
+                self.status_msg = "Switched to CommitDiff tab".to_string();
             }
             "themes" => {
                 self.status_msg = format!(
@@ -564,6 +619,22 @@ impl App {
             PaletteEntry {
                 label: "Show Help".to_string(),
                 action: PaletteAction::Command("help"),
+            },
+            PaletteEntry {
+                label: "Command Mode Help".to_string(),
+                action: PaletteAction::Command("cmdhelp"),
+            },
+            PaletteEntry {
+                label: "Open Workspace Tab".to_string(),
+                action: PaletteAction::Command("workspace"),
+            },
+            PaletteEntry {
+                label: "Open Graph Tab".to_string(),
+                action: PaletteAction::Command("graph-tab"),
+            },
+            PaletteEntry {
+                label: "Open CommitDiff Tab".to_string(),
+                action: PaletteAction::Command("commitdiff"),
             },
             PaletteEntry {
                 label: "Quit".to_string(),
@@ -673,6 +744,102 @@ impl App {
         Ok(())
     }
 
+    fn refresh_commit_diff(&mut self) {
+        if self.log_lines.is_empty() {
+            self.commit_diff_lines = vec!["No commits found.".to_string()];
+            self.commit_diff_scroll = 0;
+            return;
+        }
+
+        let mut idx = self.log_selected;
+        let mut picked: Option<String> = None;
+        while idx < self.log_commits.len() {
+            if let Some(hash) = &self.log_commits[idx] {
+                picked = Some(hash.clone());
+                break;
+            }
+            idx += 1;
+        }
+        if picked.is_none() {
+            idx = self.log_selected;
+            while idx > 0 {
+                idx -= 1;
+                if let Some(hash) = &self.log_commits[idx] {
+                    picked = Some(hash.clone());
+                    break;
+                }
+            }
+        }
+
+        let Some(hash) = picked else {
+            self.commit_diff_lines = vec!["No commit selected.".to_string()];
+            self.commit_diff_scroll = 0;
+            return;
+        };
+
+        let output = git_capture(&["show", "--stat", "--patch", "--color=never", &hash])
+            .unwrap_or_else(|e| format!("commit diff error: {e}"));
+        if output.trim().is_empty() {
+            self.commit_diff_lines = vec![format!("No diff output for commit {hash}")];
+        } else {
+            self.commit_diff_lines = output.lines().map(ToString::to_string).collect();
+        }
+        self.commit_diff_scroll = cmp::min(
+            self.commit_diff_scroll,
+            self.commit_diff_lines.len().saturating_sub(1),
+        );
+    }
+
+    fn move_home_active(&mut self) {
+        match self.tab {
+            Tab::Workspace => self.selected = 0,
+            Tab::Graph => self.log_selected = 0,
+            Tab::CommitDiff => self.commit_diff_scroll = 0,
+        }
+    }
+
+    fn move_end_active(&mut self) {
+        match self.tab {
+            Tab::Workspace => self.selected = self.files.len().saturating_sub(1),
+            Tab::Graph => self.log_selected = self.log_lines.len().saturating_sub(1),
+            Tab::CommitDiff => {
+                self.commit_diff_scroll = self.commit_diff_lines.len().saturating_sub(1)
+            }
+        }
+    }
+
+    fn move_up_active(&mut self) {
+        match self.tab {
+            Tab::Workspace => self.move_up(),
+            Tab::Graph => {
+                self.log_selected = self.log_selected.saturating_sub(1);
+                self.refresh_commit_diff();
+            }
+            Tab::CommitDiff => {
+                self.commit_diff_scroll = self.commit_diff_scroll.saturating_sub(1);
+            }
+        }
+    }
+
+    fn move_down_active(&mut self) {
+        match self.tab {
+            Tab::Workspace => self.move_down(),
+            Tab::Graph => {
+                self.log_selected = cmp::min(
+                    self.log_selected + 1,
+                    self.log_lines.len().saturating_sub(1),
+                );
+                self.refresh_commit_diff();
+            }
+            Tab::CommitDiff => {
+                self.commit_diff_scroll = cmp::min(
+                    self.commit_diff_scroll + 1,
+                    self.commit_diff_lines.len().saturating_sub(1),
+                );
+            }
+        }
+    }
+
     fn move_up(&mut self) {
         if self.files.is_empty() {
             return;
@@ -715,61 +882,80 @@ impl App {
         let hint = self
             .style
             .paint(self.theme.subtle, pad_display(hint_raw, w));
+        let tabs = self.render_tab_bar(w);
 
         draw_line(&mut out, 0, &title)?;
         draw_line(&mut out, 1, &hint)?;
+        draw_line(&mut out, 2, &tabs)?;
 
-        let body_h = h.saturating_sub(4);
-        let compact = w < 100;
+        let body_h = h.saturating_sub(5);
 
-        if compact {
-            let status_h = cmp::max(6, body_h / 2);
-            let remain = body_h.saturating_sub(status_h);
-            let log_h = cmp::max(3, remain / 2);
-            let diff_h = body_h.saturating_sub(status_h + log_h);
+        match self.tab {
+            Tab::Workspace => {
+                let compact = w < 100;
 
-            let files = self.render_files(w, status_h);
-            let logs = self.render_log(w, log_h);
-            let diff = self.render_diff(w, diff_h);
+                if compact {
+                    let status_h = cmp::max(6, body_h / 2);
+                    let remain = body_h.saturating_sub(status_h);
+                    let log_h = cmp::max(3, remain / 2);
+                    let diff_h = body_h.saturating_sub(status_h + log_h);
 
-            let mut row = 2usize;
-            for line in files {
-                draw_line(&mut out, row as u16, &line)?;
-                row += 1;
-            }
-            for line in logs {
-                draw_line(&mut out, row as u16, &line)?;
-                row += 1;
-            }
-            for line in diff {
-                draw_line(&mut out, row as u16, &line)?;
-                row += 1;
-            }
-        } else {
-            let left_w = cmp::min(cmp::max(36, w * 2 / 5), w.saturating_sub(24));
-            let right_w = w.saturating_sub(left_w + 1);
-            let log_h = body_h / 2;
+                    let files = self.render_files(w, status_h);
+                    let logs = self.render_log(w, log_h);
+                    let diff = self.render_diff(w, diff_h);
 
-            let files = self.render_files(left_w, body_h);
-            let logs = self.render_log(right_w, log_h);
-            let diff = self.render_diff(right_w, body_h.saturating_sub(log_h));
-
-            for row in 0..body_h {
-                let left = files
-                    .get(row)
-                    .cloned()
-                    .unwrap_or_else(|| " ".repeat(left_w));
-                let right = if row < log_h {
-                    logs.get(row)
-                        .cloned()
-                        .unwrap_or_else(|| " ".repeat(right_w))
+                    let mut row = 3usize;
+                    for line in files {
+                        draw_line(&mut out, row as u16, &line)?;
+                        row += 1;
+                    }
+                    for line in logs {
+                        draw_line(&mut out, row as u16, &line)?;
+                        row += 1;
+                    }
+                    for line in diff {
+                        draw_line(&mut out, row as u16, &line)?;
+                        row += 1;
+                    }
                 } else {
-                    diff.get(row - log_h)
-                        .cloned()
-                        .unwrap_or_else(|| " ".repeat(right_w))
-                };
-                let sep = self.style.paint(self.theme.accent, "│");
-                draw_line(&mut out, (row + 2) as u16, &format!("{left}{sep}{right}"))?;
+                    let left_w = cmp::min(cmp::max(36, w * 2 / 5), w.saturating_sub(24));
+                    let right_w = w.saturating_sub(left_w + 1);
+                    let log_h = body_h / 2;
+
+                    let files = self.render_files(left_w, body_h);
+                    let logs = self.render_log(right_w, log_h);
+                    let diff = self.render_diff(right_w, body_h.saturating_sub(log_h));
+
+                    for row in 0..body_h {
+                        let left = files
+                            .get(row)
+                            .cloned()
+                            .unwrap_or_else(|| " ".repeat(left_w));
+                        let right = if row < log_h {
+                            logs.get(row)
+                                .cloned()
+                                .unwrap_or_else(|| " ".repeat(right_w))
+                        } else {
+                            diff.get(row - log_h)
+                                .cloned()
+                                .unwrap_or_else(|| " ".repeat(right_w))
+                        };
+                        let sep = self.style.paint(self.theme.accent, "│");
+                        draw_line(&mut out, (row + 3) as u16, &format!("{left}{sep}{right}"))?;
+                    }
+                }
+            }
+            Tab::Graph => {
+                let graph = self.render_graph_tab(w, body_h);
+                for (row, line) in graph.into_iter().enumerate() {
+                    draw_line(&mut out, (row + 3) as u16, &line)?;
+                }
+            }
+            Tab::CommitDiff => {
+                let diff = self.render_commit_diff_tab(w, body_h);
+                for (row, line) in diff.into_iter().enumerate() {
+                    draw_line(&mut out, (row + 3) as u16, &line)?;
+                }
             }
         }
 
@@ -789,6 +975,25 @@ impl App {
 
     fn color_cell(&self, text: &str, width: usize, color: &str) -> String {
         self.style.paint(color, pad_display(text, width))
+    }
+
+    fn render_tab_bar(&self, width: usize) -> String {
+        let tab = |name: &str, active: bool| {
+            if active {
+                self.style.paint(self.theme.ok, format!("[{name}]"))
+            } else {
+                self.style.paint(self.theme.subtle, format!(" {name} "))
+            }
+        };
+        let raw = format!(
+            "{}  {}  {}    {}",
+            tab("1 Workspace", self.tab == Tab::Workspace),
+            tab("2 Graph", self.tab == Tab::Graph),
+            tab("3 CommitDiff", self.tab == Tab::CommitDiff),
+            self.style
+                .paint(self.theme.accent, "(:cmd, ? help, Ctrl+P palette)"),
+        );
+        pad_display(&raw, width)
     }
 
     fn status_rows(&self) -> Vec<StatusRow> {
@@ -948,6 +1153,76 @@ impl App {
         lines
     }
 
+    fn render_graph_tab(&self, width: usize, height: usize) -> Vec<String> {
+        let mut lines = Vec::with_capacity(height);
+        lines.push(self.color_cell(" FULL GIT GRAPH ", width, self.theme.ok));
+        if self.log_lines.is_empty() {
+            lines.push(self.color_cell("No commits available", width, self.theme.warn));
+            while lines.len() < height {
+                lines.push(" ".repeat(width));
+            }
+            return lines;
+        }
+
+        let rows = height.saturating_sub(1);
+        let start = self.log_selected.saturating_sub(rows.saturating_sub(1));
+        for (offset, line) in self.log_lines.iter().skip(start).take(rows).enumerate() {
+            let idx = start + offset;
+            let painted = if idx == self.log_selected {
+                self.color_cell(line, width, "\x1b[1;97;44m")
+            } else {
+                color_log_line(self, line, width)
+            };
+            lines.push(painted);
+        }
+        while lines.len() < height {
+            lines.push(" ".repeat(width));
+        }
+        lines
+    }
+
+    fn render_commit_diff_tab(&self, width: usize, height: usize) -> Vec<String> {
+        let mut lines = Vec::with_capacity(height);
+        lines.push(self.color_cell(" COMMIT DIFF (selected commit) ", width, self.theme.ok));
+        if self.commit_diff_lines.is_empty() {
+            lines.push(self.color_cell("No commit diff loaded", width, self.theme.warn));
+            while lines.len() < height {
+                lines.push(" ".repeat(width));
+            }
+            return lines;
+        }
+
+        let rows = height.saturating_sub(1);
+        for line in self
+            .commit_diff_lines
+            .iter()
+            .skip(self.commit_diff_scroll)
+            .take(rows)
+        {
+            let painted = if line.starts_with("@@") {
+                self.color_cell(line, width, self.theme.number)
+            } else if line.starts_with('+') && !line.starts_with("+++") {
+                self.color_cell(line, width, self.theme.ok)
+            } else if line.starts_with('-') && !line.starts_with("---") {
+                self.color_cell(line, width, self.theme.warn)
+            } else if line.starts_with("commit ")
+                || line.starts_with("Author:")
+                || line.starts_with("Date:")
+                || line.starts_with("diff --git")
+                || line.starts_with("index ")
+            {
+                self.color_cell(line, width, self.theme.accent)
+            } else {
+                self.color_cell(line, width, self.theme.info)
+            };
+            lines.push(painted);
+        }
+        while lines.len() < height {
+            lines.push(" ".repeat(width));
+        }
+        lines
+    }
+
     fn render_status_line(&self, width: usize) -> String {
         let mode = match self.input_mode {
             InputMode::None => String::new(),
@@ -968,13 +1243,19 @@ impl App {
 
     fn render_help_overlay(&self, out: &mut io::Stdout, w: usize, h: usize) -> Result<(), String> {
         let lines: Vec<(String, &'static str)> = vec![
+            ("DUSK GIT TUI HELP".to_string(), self.theme.title),
+            ("".to_string(), self.theme.info),
             ("Navigation".to_string(), self.theme.ok),
             (
                 "j/k or Up/Down move selection, g/G first/last".to_string(),
                 self.theme.info,
             ),
             (
-                "h/l or Left/Right/Tab switch panes".to_string(),
+                "h/l or Left/Right/Tab switch panes (Workspace tab)".to_string(),
+                self.theme.info,
+            ),
+            (
+                "1 Workspace, 2 Graph, 3 CommitDiff".to_string(),
                 self.theme.info,
             ),
             ("".to_string(), self.theme.info),
@@ -989,9 +1270,24 @@ impl App {
                 self.theme.info,
             ),
             ("".to_string(), self.theme.info),
+            ("Command Mode".to_string(), self.theme.ok),
+            (":help, :cmdhelp, :refresh".to_string(), self.theme.info),
+            (
+                ":stage, :unstage, :stage-all, :unstage-all".to_string(),
+                self.theme.info,
+            ),
+            (
+                ":commit <msg>, :push, :branch <name>, :switch <name>".to_string(),
+                self.theme.info,
+            ),
+            (
+                ":workspace, :graph-tab, :commitdiff, :theme <name>, :themes".to_string(),
+                self.theme.info,
+            ),
+            ("".to_string(), self.theme.info),
             ("Tools".to_string(), self.theme.ok),
             (
-                "t cycle theme, Ctrl+P command palette, : command mode".to_string(),
+                "t cycle theme, Ctrl+P command palette, P command palette".to_string(),
                 self.theme.info,
             ),
             ("Esc or ? closes this help".to_string(), self.theme.accent),
@@ -1007,6 +1303,7 @@ impl App {
     ) -> Result<(), String> {
         let entries = self.filtered_palette_entries();
         let mut lines: Vec<(String, &'static str)> = Vec::new();
+        lines.push(("COMMAND PALETTE".to_string(), self.theme.title));
         lines.push((
             format!("Query: {}", self.palette_query),
             if self.palette_query.is_empty() {
@@ -1067,15 +1364,7 @@ impl App {
         let x = (w.saturating_sub(box_w)) / 2;
         let y = (h.saturating_sub(box_h)) / 2;
 
-        let mut top = format!("┌{}┐", "─".repeat(inner_w));
-        let title_text = truncate_display(title, inner_w.saturating_sub(2));
-        let title_w = UnicodeWidthStr::width(title_text.as_str());
-        let title_x = 1 + (inner_w.saturating_sub(title_w)) / 2;
-        if title_x + title_w <= top.len() {
-            let replace_start = title_x;
-            let replace_end = replace_start + title_w;
-            top.replace_range(replace_start..replace_end, &title_text);
-        }
+        let top = format!("┌{}┐", "─".repeat(inner_w));
         draw_at(
             out,
             x as u16,
@@ -1083,13 +1372,26 @@ impl App {
             &self.style.paint(self.theme.accent, top),
         )?;
 
-        for (i, (line, color)) in lines.iter().take(content_h).enumerate() {
+        let title_line = pad_display(title, inner_w);
+        draw_at(
+            out,
+            x as u16,
+            (y + 1) as u16,
+            &format!(
+                "{}{}{}",
+                self.style.paint(self.theme.accent, "│"),
+                self.style.paint(self.theme.title, title_line),
+                self.style.paint(self.theme.accent, "│")
+            ),
+        )?;
+
+        for (i, (line, color)) in lines.iter().take(content_h.saturating_sub(1)).enumerate() {
             let padded = pad_display(line, inner_w);
             let painted = self.style.paint(*color, padded);
             draw_at(
                 out,
                 x as u16,
-                (y + 1 + i) as u16,
+                (y + 2 + i) as u16,
                 &format!(
                     "{}{}{}",
                     self.style.paint(self.theme.accent, "│"),
@@ -1124,6 +1426,20 @@ fn next_pane(pane: Pane) -> Pane {
         Pane::Log => Pane::Diff,
         Pane::Diff => Pane::Files,
     }
+}
+
+fn parse_commit_hash(line: &str) -> Option<String> {
+    line.split_whitespace().find_map(|tok| {
+        if tok.len() >= 7 && tok.chars().all(|c| c.is_ascii_hexdigit()) {
+            Some(tok.to_string())
+        } else {
+            None
+        }
+    })
+}
+
+fn command_mode_help() -> String {
+    "Cmds: help|cmdhelp|refresh|stage|unstage|stage-all|unstage-all|commit <msg>|push|branch <name>|switch <name>|workspace|graph-tab|commitdiff|theme <name>|themes|palette|quit".to_string()
 }
 
 fn parse_porcelain(s: &str) -> Vec<FileStatus> {
