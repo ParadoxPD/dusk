@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use crossterm::cursor::{Hide, MoveTo, Show};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{DisableMouseCapture, EnableMouseCapture, MouseEventKind};
 use crossterm::execute;
 use crossterm::queue;
 use crossterm::style::Print;
@@ -131,7 +132,7 @@ struct TerminalGuard;
 impl TerminalGuard {
     fn enter() -> Result<Self, String> {
         terminal::enable_raw_mode().map_err(|e| format!("failed to enable raw mode: {e}"))?;
-        execute!(io::stdout(), EnterAlternateScreen, Hide)
+        execute!(io::stdout(), EnterAlternateScreen, Hide, EnableMouseCapture)
             .map_err(|e| format!("failed to enter alternate screen: {e}"))?;
         Ok(Self)
     }
@@ -139,7 +140,12 @@ impl TerminalGuard {
 
 impl Drop for TerminalGuard {
     fn drop(&mut self) {
-        let _ = execute!(io::stdout(), Show, LeaveAlternateScreen);
+        let _ = execute!(
+            io::stdout(),
+            Show,
+            DisableMouseCapture,
+            LeaveAlternateScreen
+        );
         let _ = terminal::disable_raw_mode();
     }
 }
@@ -169,6 +175,14 @@ pub fn run(theme_name: Option<&str>) -> Result<(), String> {
                 dirty = true;
             }
             Event::Resize(_, _) => dirty = true,
+            Event::Mouse(mouse) => {
+                match mouse.kind {
+                    MouseEventKind::ScrollUp => app.scroll_active_up(),
+                    MouseEventKind::ScrollDown => app.scroll_active_down(),
+                    _ => {}
+                }
+                dirty = true;
+            }
             _ => {}
         }
     }
@@ -365,22 +379,19 @@ impl App {
                 }
                 KeyCode::Enter => return self.execute_palette_selection(),
                 KeyCode::Backspace => {
-                    self.palette_query.pop();
-                    self.palette_selected = 0;
-                }
-                KeyCode::Up | KeyCode::Char('k') => {
-                    self.palette_selected = self.palette_selected.saturating_sub(1);
-                }
-                KeyCode::Down | KeyCode::Char('j') => {
-                    let len = self.filtered_palette_entries().len();
-                    if len > 0 {
-                        self.palette_selected = cmp::min(self.palette_selected + 1, len - 1);
+                    let changed = self.palette_query.pop().is_some();
+                    if changed {
+                        self.clamp_palette_selected();
+                    } else {
+                        self.select_prev_palette();
                     }
                 }
+                KeyCode::Up | KeyCode::Char('k') => self.select_prev_palette(),
+                KeyCode::Down | KeyCode::Char('j') => self.select_next_palette(),
                 KeyCode::Char(ch) => {
                     if !key.modifiers.contains(KeyModifiers::CONTROL) {
                         self.palette_query.push(ch);
-                        self.palette_selected = 0;
+                        self.clamp_palette_selected();
                     }
                 }
                 _ => {}
@@ -663,6 +674,37 @@ impl App {
             .collect()
     }
 
+    fn clamp_palette_selected(&mut self) {
+        let len = self.filtered_palette_entries().len();
+        if len == 0 {
+            self.palette_selected = 0;
+        } else {
+            self.palette_selected = cmp::min(self.palette_selected, len - 1);
+        }
+    }
+
+    fn select_next_palette(&mut self) {
+        let len = self.filtered_palette_entries().len();
+        if len == 0 {
+            self.palette_selected = 0;
+            return;
+        }
+        self.palette_selected = (self.palette_selected + 1) % len;
+    }
+
+    fn select_prev_palette(&mut self) {
+        let len = self.filtered_palette_entries().len();
+        if len == 0 {
+            self.palette_selected = 0;
+            return;
+        }
+        if self.palette_selected == 0 {
+            self.palette_selected = len - 1;
+        } else {
+            self.palette_selected -= 1;
+        }
+    }
+
     fn execute_palette_selection(&mut self) -> Result<bool, String> {
         let entries = self.filtered_palette_entries();
         if entries.is_empty() {
@@ -838,6 +880,22 @@ impl App {
                 );
             }
         }
+    }
+
+    fn scroll_active_up(&mut self) {
+        if self.overlay == Some(Overlay::Palette) {
+            self.select_prev_palette();
+            return;
+        }
+        self.move_up_active();
+    }
+
+    fn scroll_active_down(&mut self) {
+        if self.overlay == Some(Overlay::Palette) {
+            self.select_next_palette();
+            return;
+        }
+        self.move_down_active();
     }
 
     fn move_up(&mut self) {
@@ -1226,10 +1284,10 @@ impl App {
     fn render_status_line(&self, width: usize) -> String {
         let mode = match self.input_mode {
             InputMode::None => String::new(),
-            InputMode::Commit => format!("commit msg: {}", self.input),
-            InputMode::NewBranch => format!("new branch: {}", self.input),
-            InputMode::SwitchBranch => format!("switch branch: {}", self.input),
-            InputMode::Command => format!(":{}", self.input),
+            InputMode::Commit => format!("commit msg: {}▌", self.input),
+            InputMode::NewBranch => format!("new branch: {}▌", self.input),
+            InputMode::SwitchBranch => format!("switch branch: {}▌", self.input),
+            InputMode::Command => format!(":{}▌", self.input),
         };
 
         if mode.is_empty() {
@@ -1303,9 +1361,8 @@ impl App {
     ) -> Result<(), String> {
         let entries = self.filtered_palette_entries();
         let mut lines: Vec<(String, &'static str)> = Vec::new();
-        lines.push(("COMMAND PALETTE".to_string(), self.theme.title));
         lines.push((
-            format!("Query: {}", self.palette_query),
+            format!("Query: {}▌", self.palette_query),
             if self.palette_query.is_empty() {
                 self.theme.subtle
             } else {
@@ -1322,9 +1379,24 @@ impl App {
             lines.push(("No commands match query".to_string(), self.theme.warn));
         } else {
             let max_items = 10usize;
-            for (i, item) in entries.iter().take(max_items).enumerate() {
-                let prefix = if i == self.palette_selected { ">" } else { " " };
-                let color = if i == self.palette_selected {
+            let window_start = if self.palette_selected >= max_items {
+                self.palette_selected + 1 - max_items
+            } else {
+                0
+            };
+            for (i, item) in entries
+                .iter()
+                .skip(window_start)
+                .take(max_items)
+                .enumerate()
+            {
+                let actual = window_start + i;
+                let prefix = if actual == self.palette_selected {
+                    ">"
+                } else {
+                    " "
+                };
+                let color = if actual == self.palette_selected {
                     self.theme.ok
                 } else if item.label.starts_with("Theme:") {
                     self.theme.accent
@@ -1333,9 +1405,12 @@ impl App {
                 };
                 lines.push((format!("{prefix} {}", item.label), color));
             }
-            if entries.len() > max_items {
+            if entries.len() > max_items && window_start + max_items < entries.len() {
                 lines.push((
-                    format!("… {} more entries", entries.len() - max_items),
+                    format!(
+                        "… {} more entries",
+                        entries.len() - (window_start + max_items)
+                    ),
                     self.theme.subtle,
                 ));
             }
