@@ -39,7 +39,7 @@ Display:
 - `-i`: show metadata (permission bits + modified timestamp)
 - `-s`: hide file sizes
 - `--no-icon`: disable Nerd Font icons
-- `--theme <name>`: `default | nord | gruvbox | dracula | solarized | catppuccin | tokyonight | onedark | monokai | kanagawa | everforest | rose-pine | ayu | nightfox`
+- `--theme <name>`: `default | nord | gruvbox | dracula | solarized | catppuccin | tokyonight | onedark-pro | monokai | kanagawa | everforest | rose-pine | ayu | nightfox`
 - `--tests`: highlight test files/directories
 - `--count`: show per-directory file counts
 - `--noreport`: hide the final summary line
@@ -105,7 +105,7 @@ Output formats:
 - `--basic`: classic plain output (no colors/icons)
 - `--sort <mode>`: `name | size | time`
 - `-r, --reverse`: reverse sorting
-- `--theme <name>`: `default | nord | gruvbox | dracula | solarized | catppuccin | tokyonight | onedark | monokai | kanagawa | everforest | rose-pine | ayu | nightfox`
+- `--theme <name>`: `default | nord | gruvbox | dracula | solarized | catppuccin | tokyonight | onedark-pro | monokai | kanagawa | everforest | rose-pine | ayu | nightfox`
 - `-h, --help`: help
 
 ### Examples
@@ -128,7 +128,7 @@ Output formats:
 - `-n, --number`: show line numbers
 - `--no-number`: hide line numbers
 - `-p, --plain`: disable color styling
-- `--theme <name>`: `default | nord | gruvbox | dracula | solarized | catppuccin | tokyonight | onedark | monokai | kanagawa | everforest | rose-pine | ayu | nightfox`
+- `--theme <name>`: `default | nord | gruvbox | dracula | solarized | catppuccin | tokyonight | onedark-pro | monokai | kanagawa | everforest | rose-pine | ayu | nightfox`
 - `-h, --help`: help
 - `--pretty`: force bat-like pretty mode
 - `-b`: number nonblank lines
@@ -209,7 +209,7 @@ These pass arguments through to installed tools.
   - Icon rendering uses an expanded developer-focused Nerd Font icon library shared across commands.
   - `cat` behaves like basic cat by default; `bat` alias enables pretty mode by default.
   - `ls` accepts common built-in flags (`-a`, `-l`, `-r`, `-t`, `-S`, `-h`, `--color`).
-  - Default theme is `tokyonight` with high-visibility colors (gray/dim palette avoided).
+  - Default theme is `onedark-pro` with high-visibility colors (gray/dim palette avoided).
 
 - Wrappers that still depend on system binaries:
   - `find` and `rg` subcommands require `find` and (`rg` or `grep`) in `PATH`.

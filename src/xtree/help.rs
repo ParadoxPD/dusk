@@ -131,7 +131,7 @@ pub fn full_help(theme_name: Option<&str>) -> String {
         opt("--no-icon"),
         desc("Disable Nerd Font icons")
     ));
-    out.push_str(&format!("  {} {}\n", opt("--theme <name>"), desc("Theme: default | nord | gruvbox | dracula | solarized | catppuccin | tokyonight | onedark | monokai | kanagawa | everforest | rose-pine | ayu | nightfox")));
+    out.push_str(&format!("  {} {}\n", opt("--theme <name>"), desc("Theme: default | nord | gruvbox | dracula | solarized | catppuccin | tokyonight | onedark-pro | monokai | kanagawa | everforest | rose-pine | ayu | nightfox")));
     out.push_str(&format!(
         "  {} {}\n",
         opt("--tests"),

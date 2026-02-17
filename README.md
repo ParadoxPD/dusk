@@ -38,10 +38,10 @@ dusk xtree --help
 ## Themes
 
 ```text
-default, nord, gruvbox, dracula, solarized, catppuccin, tokyonight, onedark, monokai, kanagawa, everforest, rose-pine, ayu, nightfox
+default, nord, gruvbox, dracula, solarized, catppuccin, tokyonight, onedark-pro, monokai, kanagawa, everforest, rose-pine, ayu, nightfox
 ```
 
-Default theme: `tokyonight`
+Default theme: `onedark-pro`
 
 ## Notes
 

@@ -92,7 +92,7 @@ pub const THEMES: [Theme; 14] = [
         reset: "\x1b[0m",
     },
     Theme {
-        name: "onedark",
+        name: "onedark-pro",
         accent: "\x1b[38;5;75m",
         ok: "\x1b[38;5;114m",
         warn: "\x1b[38;5;203m",
@@ -172,12 +172,15 @@ pub const THEMES: [Theme; 14] = [
 
 pub fn resolve(name: Option<&str>) -> Theme {
     let env_theme = std::env::var("DUSK_THEME").ok();
-    let wanted = name.or(env_theme.as_deref()).unwrap_or("tokyonight");
+    let mut wanted = name.or(env_theme.as_deref()).unwrap_or("onedark-pro");
+    if wanted == "onedark" {
+        wanted = "onedark-pro";
+    }
     THEMES
         .iter()
         .copied()
         .find(|theme| theme.name == wanted)
-        .unwrap_or(THEMES[6])
+        .unwrap_or(THEMES[7])
 }
 
 pub fn plain() -> Theme {

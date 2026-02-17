@@ -118,7 +118,7 @@ impl Theme {
                 test: "\x1b[1;38;5;114m",
                 count: "\x1b[38;5;117m",
             },
-            "onedark" => Self {
+            "onedark" | "onedark-pro" => Self {
                 reset: "\x1b[0m",
                 dir: "\x1b[38;5;75m",
                 file: "\x1b[38;5;188m",
