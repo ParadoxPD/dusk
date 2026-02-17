@@ -10,6 +10,7 @@
 - terminal-capability-aware ANSI coloring (no ANSI escape leakage in pipes/redirection)
 
 See `FEATURES.md` for the complete command and flag reference.
+See `TESTING.md` for tests, benchmarks, and coverage commands.
 
 ## Commands
 

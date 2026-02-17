@@ -8,6 +8,29 @@ pub struct Style {
     pub icons: bool,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::Style;
+
+    #[test]
+    fn paint_without_color_is_plain() {
+        let style = Style {
+            color: false,
+            icons: false,
+        };
+        assert_eq!(style.paint("\x1b[31m", "hello"), "hello");
+    }
+
+    #[test]
+    fn paint_with_color_wraps_ansi() {
+        let style = Style {
+            color: true,
+            icons: true,
+        };
+        assert_eq!(style.paint("\x1b[31m", "x"), "\x1b[31mx\x1b[0m");
+    }
+}
+
 impl Style {
     pub fn for_stdout() -> Self {
         let tty = atty::is(Stream::Stdout);

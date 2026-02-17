@@ -203,3 +203,33 @@ impl Config {
         Ok(cfg)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{Config, Mode, SortMode};
+    use std::ffi::OsString;
+
+    #[test]
+    fn parse_tree_compat_flags() {
+        let args = vec![
+            OsString::from("-I"),
+            OsString::from("target"),
+            OsString::from("--noreport"),
+        ];
+        let cfg = Config::parse(&args).expect("parse");
+        assert!(cfg.excludes.contains(&"target".to_string()));
+        assert!(cfg.no_report);
+    }
+
+    #[test]
+    fn parse_modes_and_sort() {
+        let args = vec![
+            OsString::from("--json"),
+            OsString::from("--sort"),
+            OsString::from("time"),
+        ];
+        let cfg = Config::parse(&args).expect("parse");
+        assert!(matches!(cfg.mode, Mode::Json));
+        assert!(matches!(cfg.sort_mode, SortMode::Time));
+    }
+}

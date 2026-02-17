@@ -201,3 +201,20 @@ pub fn active(name: Option<&str>) -> Theme {
     let style = Style::for_stdout();
     if style.color { resolve(name) } else { plain() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::resolve;
+
+    #[test]
+    fn resolves_onedark_alias_to_onedark_pro() {
+        let t = resolve(Some("onedark"));
+        assert_eq!(t.name, "onedark-pro");
+    }
+
+    #[test]
+    fn unknown_theme_falls_back_to_default_theme() {
+        let t = resolve(Some("unknown-theme"));
+        assert_eq!(t.name, "onedark-pro");
+    }
+}
