@@ -21,6 +21,7 @@ dusk rg [ripgrep-options...]
 dusk ls [native-ls-options...]
 dusk cat [native-cat-options...]
 
+dusk git log [theme]
 dusk git graph [theme]
 dusk git status [theme]
 dusk diff [theme] [--staged]
@@ -40,13 +41,18 @@ dusk xtree --help
 default, nord, gruvbox, dracula, solarized, catppuccin, tokyonight, onedark, monokai, kanagawa, everforest, rose-pine, ayu, nightfox
 ```
 
+Default theme: `tokyonight`
+
 ## Notes
 
 - `dusk tree`, `dusk ls`, and `dusk cat` are native Rust implementations (no `tree`, `eza`, or `bat` subprocesses).
 - `dusk cat` defaults to basic `cat`-style plain output and supports stdin.
 - `dusk bat` is an alias that defaults to pretty, themed, line-numbered output.
-- `dusk ls` supports common `ls` flags (`-a`, `-l`, `-r`, `-t`, `-S`, `-h`, `--color`).
+- `dusk ls` defaults to eza-style colorful/icon-rich output (TTY) and supports common `ls` flags (`-a`, `-l`, `-r`, `-t`, `-S`, `-h`, `--color`) with aligned long-format columns.
+- `dusk ls --basic` switches to classic plain output.
 - `dusk find` uses system `find`.
 - `dusk rg` uses `rg` if installed, otherwise falls back to system `grep`.
 - `dusk xtree` is implemented in pure Rust (no embedded shell script).
+- `dusk diff` renders side-by-side output with old/new line numbers.
+- `dusk git log` provides a rich commit graph view similar to VSCode-style history visuals.
 - Colors are automatically disabled for non-interactive output (`NO_COLOR`, non-TTY, `TERM=dumb`), so redirected/piped output stays clean.

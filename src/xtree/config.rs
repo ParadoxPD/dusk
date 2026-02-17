@@ -82,7 +82,7 @@ impl Default for Config {
             use_treeignore: true,
             show_icons: true,
             no_report: false,
-            theme: "default".to_string(),
+            theme: "tokyonight".to_string(),
             mode: Mode::Normal,
             help: false,
             tldr: false,

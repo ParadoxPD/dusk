@@ -66,11 +66,15 @@ pub fn run(argv: Vec<String>) -> Result<(), String> {
 fn print_help() {
     let theme = theme::active(None);
     println!(
-        "{}dusk{}: one terminal tool for tree/find/grep/ls/cat + git visualization\n\n{}{} Native commands{}\n  {} dusk tree [args...]{}          # Rust tree implementation (xtree engine)\n  {} dusk ls [args...]{}            # Rust eza-style listing\n  {} dusk cat [args...]{}           # Rust bat-style file viewer\n  {} dusk xtree [args...]{}         # Extended tree/analyzer mode\n  {} dusk git graph [theme]{}       # Graph view (VSCode-style terminal log)\n  {} dusk git status [theme]{}      # Staged/modified/untracked panel\n  {} dusk diff [theme] [--staged]{} # Colorful git diff\n  {} dusk themes list{}             # Theme catalog\n\n{}{} Pass-through{}\n  {} dusk find [args...]{}          # System find\n  {} dusk rg [args...]{}            # rg, or grep fallback if rg is missing\n\n{}Quick start:{}\n  dusk xtree --tldr\n  dusk xtree --help\n  dusk ls -la --sort time\n  dusk cat src/main.rs\n",
+        "{}dusk{}: one terminal tool for tree/find/grep/ls/cat + git visualization\n\n{}{} Native commands{}\n  {} dusk tree [args...]{}          # Rust tree implementation (xtree engine)\n  {} dusk ls [args...]{}            # Rust eza-style listing\n  {} dusk cat [args...]{}           # Plain cat-compatible behavior\n  {} dusk bat [args...]{}           # Pretty themed file viewer\n  {} dusk xtree [args...]{}         # Extended tree/analyzer mode\n  {} dusk git log [theme]{}         # Informative git history graph\n  {} dusk git graph [theme]{}       # Alias of git log\n  {} dusk git status [theme]{}      # Staged/modified/untracked panel\n  {} dusk diff [theme] [--staged]{} # Side-by-side git diff with line numbers\n  {} dusk themes list{}             # Theme catalog\n\n{}{} Pass-through{}\n  {} dusk find [args...]{}          # System find\n  {} dusk rg [args...]{}            # rg, or grep fallback if rg is missing\n\n{}Quick start:{}\n  dusk xtree --tldr\n  dusk xtree --help\n  dusk ls -laht\n  dusk cat src/main.rs\n  dusk bat src/main.rs\n  dusk git log\n",
         theme.title,
         theme.reset,
         theme.accent,
         icons::ICON_TREE,
+        theme.reset,
+        theme.info,
+        theme.reset,
+        theme.info,
         theme.reset,
         theme.info,
         theme.reset,

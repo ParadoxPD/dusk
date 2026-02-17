@@ -26,10 +26,10 @@ struct Opts {
     show_hidden: bool,
     long: bool,
     icons: bool,
+    basic: bool,
     sort: SortMode,
     reverse: bool,
     human: bool,
-    one_per_line: bool,
     color: ColorMode,
     theme: Option<String>,
     paths: Vec<PathBuf>,
@@ -40,16 +40,33 @@ impl Default for Opts {
         Self {
             show_hidden: false,
             long: false,
-            icons: false,
+            icons: true,
+            basic: false,
             sort: SortMode::Name,
             reverse: false,
             human: false,
-            one_per_line: true,
             color: ColorMode::Auto,
             theme: None,
             paths: vec![PathBuf::from(".")],
         }
     }
+}
+
+#[derive(Clone)]
+struct Row {
+    perms: String,
+    size: String,
+    modified: String,
+    display: String,
+    kind: EntryKind,
+}
+
+#[derive(Clone, Copy)]
+enum EntryKind {
+    Dir,
+    Exec,
+    Link,
+    File,
 }
 
 pub fn run(args: &[OsString]) -> Result<(), String> {
@@ -69,6 +86,9 @@ pub fn run(args: &[OsString]) -> Result<(), String> {
         ColorMode::Always => true,
         ColorMode::Never => false,
     };
+    if opts.basic {
+        style.color = false;
+    }
 
     let theme = if style.color {
         theme::resolve(opts.theme.as_deref())
@@ -87,39 +107,40 @@ pub fn run(args: &[OsString]) -> Result<(), String> {
             );
         }
 
-        if path.is_file() {
-            print_entry(path, &opts, &style, theme)?;
-            continue;
-        }
-
-        if !path.is_dir() {
-            return Err(format!("no such file or directory: {}", path.display()));
-        }
-
-        let mut entries = fs::read_dir(path)
-            .map_err(|err| format!("failed reading {}: {err}", path.display()))?
-            .filter_map(Result::ok)
-            .map(|e| e.path())
-            .filter(|p| {
-                if opts.show_hidden {
-                    true
-                } else {
-                    !p.file_name()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or_default()
-                        .starts_with('.')
-                }
-            })
-            .collect::<Vec<_>>();
+        let mut entries = if path.is_file() {
+            vec![path.clone()]
+        } else {
+            if !path.is_dir() {
+                return Err(format!("no such file or directory: {}", path.display()));
+            }
+            fs::read_dir(path)
+                .map_err(|err| format!("failed reading {}: {err}", path.display()))?
+                .filter_map(Result::ok)
+                .map(|e| e.path())
+                .filter(|p| {
+                    if opts.show_hidden {
+                        true
+                    } else {
+                        !p.file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or_default()
+                            .starts_with('.')
+                    }
+                })
+                .collect::<Vec<_>>()
+        };
 
         entries.sort_by(|a, b| sort_key(a, opts.sort).cmp(&sort_key(b, opts.sort)));
         if opts.reverse {
             entries.reverse();
         }
 
-        for item in entries {
-            print_entry(&item, &opts, &style, theme)?;
+        let mut rows = Vec::new();
+        for entry in &entries {
+            rows.push(build_row(entry, &opts, &style)?);
         }
+
+        print_rows(&rows, &opts, &style, theme);
     }
 
     Ok(())
@@ -178,6 +199,11 @@ fn parse(args: &[OsString]) -> Result<Opts, String> {
             "--human-readable" => opts.human = true,
             "--icons" => opts.icons = true,
             "--no-icons" => opts.icons = false,
+            "--basic" => {
+                opts.basic = true;
+                opts.icons = false;
+                opts.color = ColorMode::Never;
+            }
             _ if s.starts_with('-') && s.len() > 1 => {
                 for ch in s[1..].chars() {
                     match ch {
@@ -187,7 +213,7 @@ fn parse(args: &[OsString]) -> Result<Opts, String> {
                         't' => opts.sort = SortMode::Time,
                         'S' => opts.sort = SortMode::Size,
                         'h' => opts.human = true,
-                        '1' => opts.one_per_line = true,
+                        '1' => {}
                         _ => return Err(format!("unknown flag: -{ch}")),
                     }
                 }
@@ -206,7 +232,7 @@ fn parse(args: &[OsString]) -> Result<Opts, String> {
 fn print_help() {
     let theme = theme::active(None);
     println!(
-        "{}dusk ls{} (ls-compatible, eza-style enhancements)\n\n{}USAGE{}\n  dusk ls [OPTIONS] [FILE|DIR]...\n\n{}COMMON FLAGS{}\n  -a, --all            Include hidden files\n  -l, --long           Long listing format\n  -r, --reverse        Reverse sort order\n  -t                   Sort by modification time\n  -S                   Sort by file size\n  -h, --human-readable Human-readable sizes in long mode\n  -1                   One entry per line\n  --color=<when>       auto | always | never\n\n{}ENHANCED FLAGS{}\n  --icons              Enable Nerd Font icons\n  --no-icons           Disable icons\n  --theme <name>       Select color theme\n  --sort <mode>        name | size | time\n  -h, --help           Show this help\n",
+        "{}dusk ls{} (ls-compatible, eza-style enhancements)\n\n{}USAGE{}\n  dusk ls [OPTIONS] [FILE|DIR]...\n\n{}COMMON FLAGS{}\n  -a, --all            Include hidden files\n  -l, --long           Long listing format\n  -r, --reverse        Reverse sort order\n  -t                   Sort by modification time\n  -S                   Sort by file size\n  -h, --human-readable Human-readable sizes in long mode\n  --color=<when>       auto | always | never\n\n{}ENHANCED FLAGS{}\n  --icons              Enable Nerd Font icons (default)\n  --no-icons           Disable icons\n  --basic              Classic plain ls output (no color, no icons)\n  --theme <name>       Select color theme\n  --sort <mode>        name | size | time\n  -h, --help           Show this help\n",
         theme.title,
         theme.reset,
         theme.accent,
@@ -218,7 +244,7 @@ fn print_help() {
     );
 }
 
-fn print_entry(path: &Path, opts: &Opts, style: &Style, theme: theme::Theme) -> Result<(), String> {
+fn build_row(path: &Path, opts: &Opts, style: &Style) -> Result<Row, String> {
     let md = fs::symlink_metadata(path)
         .map_err(|err| format!("failed metadata {}: {err}", path.display()))?;
     let name = path
@@ -226,33 +252,33 @@ fn print_entry(path: &Path, opts: &Opts, style: &Style, theme: theme::Theme) -> 
         .and_then(|n| n.to_str())
         .unwrap_or_default();
 
+    let kind = if md.file_type().is_symlink() {
+        EntryKind::Link
+    } else if md.is_dir() {
+        EntryKind::Dir
+    } else if is_executable(&md) {
+        EntryKind::Exec
+    } else {
+        EntryKind::File
+    };
+
     let icon = if opts.icons {
-        if md.file_type().is_symlink() {
-            style.maybe_icon(devicons::ICON_LINK)
-        } else if md.is_dir() {
-            style.maybe_icon(devicons::ICON_DIR)
-        } else if is_executable(&md) {
-            style.maybe_icon(devicons::ICON_EXEC)
-        } else {
-            style.maybe_icon(devicons::file_icon(path))
+        match kind {
+            EntryKind::Link => style.maybe_icon(devicons::ICON_LINK),
+            EntryKind::Dir => style.maybe_icon(devicons::ICON_DIR),
+            EntryKind::Exec => style.maybe_icon(devicons::ICON_EXEC),
+            EntryKind::File => style.maybe_icon(devicons::file_icon(path)),
         }
     } else {
         ""
     };
     let gap = if icon.is_empty() { "" } else { " " };
 
-    if !opts.long {
-        if md.is_dir() {
-            println!(
-                "{}",
-                style.paint(theme.accent, format!("{icon}{gap}{name}/"))
-            );
-        } else if is_executable(&md) {
-            println!("{}", style.paint(theme.ok, format!("{icon}{gap}{name}*")));
-        } else {
-            println!("{}", style.paint(theme.info, format!("{icon}{gap}{name}")));
-        }
-        return Ok(());
+    let mut display = format!("{icon}{gap}{name}");
+    if matches!(kind, EntryKind::Dir) {
+        display.push('/');
+    } else if matches!(kind, EntryKind::Exec) {
+        display.push('*');
     }
 
     let perms = permissions(&md);
@@ -270,22 +296,49 @@ fn print_entry(path: &Path, opts: &Opts, style: &Style, theme: theme::Theme) -> 
         })
         .unwrap_or_else(|| "unknown".to_string());
 
-    let left = format!(
-        "{} {:>9} {}",
-        style.paint(theme.subtle, perms),
-        style.paint(theme.info, size),
-        style.paint(theme.subtle, modified)
-    );
-    let body = if md.is_dir() {
-        style.paint(theme.accent, format!("{icon}{gap}{name}/"))
-    } else if is_executable(&md) {
-        style.paint(theme.ok, format!("{icon}{gap}{name}*"))
-    } else {
-        style.paint(theme.info, format!("{icon}{gap}{name}"))
-    };
+    Ok(Row {
+        perms,
+        size,
+        modified,
+        display,
+        kind,
+    })
+}
 
-    println!("{left} {body}");
-    Ok(())
+fn print_rows(rows: &[Row], opts: &Opts, style: &Style, theme: theme::Theme) {
+    let (perm_w, size_w, mod_w) = rows.iter().fold((0usize, 0usize, 0usize), |acc, r| {
+        (
+            acc.0.max(r.perms.len()),
+            acc.1.max(r.size.len()),
+            acc.2.max(r.modified.len()),
+        )
+    });
+
+    for row in rows {
+        let body_color = match row.kind {
+            EntryKind::Dir => theme.accent,
+            EntryKind::Exec => theme.ok,
+            EntryKind::Link => theme.warn,
+            EntryKind::File => theme.info,
+        };
+
+        if !opts.long {
+            println!("{}", style.paint(body_color, &row.display));
+            continue;
+        }
+
+        let perms = format!("{:perm_w$}", row.perms, perm_w = perm_w);
+        let size = format!("{:>size_w$}", row.size, size_w = size_w);
+        let modified = format!("{:mod_w$}", row.modified, mod_w = mod_w);
+
+        let left = format!(
+            "{} {} {}",
+            style.paint(theme.info, perms),
+            style.paint(theme.accent, size),
+            style.paint(theme.number, modified)
+        );
+        println!("{left} {}", style.paint(body_color, &row.display));
+    }
 }
 
 fn sort_key(path: &Path, sort: SortMode) -> (i128, String) {

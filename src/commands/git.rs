@@ -1,62 +1,69 @@
 use crate::core::icons;
 use crate::core::process;
+use crate::core::style::Style;
 use crate::core::theme;
 
 pub fn run(args: &[String]) -> Result<(), String> {
     let sub = args.first().map(|s| s.as_str()).unwrap_or("graph");
 
     match sub {
-        "graph" => graph(args.get(1).map(String::as_str)),
+        "graph" | "log" => log_graph(args.get(1).map(String::as_str)),
         "status" | "viz" => status_panel(args.get(1).map(String::as_str)),
-        _ => Err("git supports: graph | status".to_string()),
+        _ => Err("git supports: graph | log | status".to_string()),
     }
 }
 
-fn graph(theme_name: Option<&str>) -> Result<(), String> {
+fn log_graph(theme_name: Option<&str>) -> Result<(), String> {
     let theme = theme::active(theme_name);
-    let color_mode = if theme.reset.is_empty() {
-        "--color=never"
-    } else {
-        "--color=always"
-    };
+    let style = Style::for_stdout();
+
     println!(
-        "{}{} Git Graph{}",
-        theme.accent,
-        icons::ICON_GIT,
-        theme.reset
+        "{}",
+        style.paint(
+            theme.title,
+            format!("{} Git History Graph", icons::ICON_GIT)
+        )
     );
+
+    let color_mode = if style.color {
+        "--color=always"
+    } else {
+        "--color=never"
+    };
 
     let output = process::run_capture(
         "git",
         &[
             "log",
             "--graph",
-            "--decorate",
-            "--oneline",
             "--all",
+            "--decorate",
+            "--date=relative",
+            "--pretty=format:%C(bold blue)%h%Creset%x09%C(yellow)%d%Creset%x09%s%x09%C(cyan)%an%Creset%x09%C(green)%cr%Creset",
             color_mode,
         ],
     )
     .map_err(|err| format!("failed to run git log graph: {err}"))?;
 
     print!("{output}");
+    println!();
     Ok(())
 }
 
 fn status_panel(theme_name: Option<&str>) -> Result<(), String> {
     let theme = theme::active(theme_name);
+    let style = Style::for_stdout();
     let branch = process::run_capture("git", &["branch", "--show-current"])
         .map_err(|err| format!("failed to read branch: {err}"))?;
     let porcelain = process::run_capture("git", &["status", "--porcelain"])
         .map_err(|err| format!("failed to read status: {err}"))?;
 
     println!(
-        "{}{} {} {}{}",
-        theme.accent,
-        icons::ICON_BRANCH,
-        "Branch:",
-        branch.trim(),
-        theme.reset
+        "{}",
+        style.paint(
+            theme.accent,
+            format!("{} Branch: {}", icons::ICON_BRANCH, branch.trim())
+        )
     );
 
     let mut staged = Vec::new();
@@ -84,40 +91,39 @@ fn status_panel(theme_name: Option<&str>) -> Result<(), String> {
         }
     }
 
-    println!("{}{} Staged{}", theme.ok, icons::ICON_STAGED, theme.reset);
+    println!(
+        "{}",
+        style.paint(theme.ok, format!("{} Staged", icons::ICON_STAGED))
+    );
     if staged.is_empty() {
-        println!("  {}none{}", theme.subtle, theme.reset);
+        println!("  {}", style.paint(theme.info, "none"));
     } else {
         for path in staged {
-            println!("  {path}");
+            println!("  {}", style.paint(theme.info, path));
         }
     }
 
     println!(
-        "{}{} Modified{}",
-        theme.warn,
-        icons::ICON_MODIFIED,
-        theme.reset
+        "{}",
+        style.paint(theme.warn, format!("{} Modified", icons::ICON_MODIFIED))
     );
     if modified.is_empty() {
-        println!("  {}none{}", theme.subtle, theme.reset);
+        println!("  {}", style.paint(theme.info, "none"));
     } else {
         for path in modified {
-            println!("  {path}");
+            println!("  {}", style.paint(theme.info, path));
         }
     }
 
     println!(
-        "{}{} Untracked{}",
-        theme.accent,
-        icons::ICON_UNTRACKED,
-        theme.reset
+        "{}",
+        style.paint(theme.accent, format!("{} Untracked", icons::ICON_UNTRACKED))
     );
     if untracked.is_empty() {
-        println!("  {}none{}", theme.subtle, theme.reset);
+        println!("  {}", style.paint(theme.info, "none"));
     } else {
         for path in untracked {
-            println!("  {path}");
+            println!("  {}", style.paint(theme.info, path));
         }
     }
 

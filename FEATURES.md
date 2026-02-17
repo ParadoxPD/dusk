@@ -7,6 +7,7 @@
 - `dusk help`
 - `dusk xtree [OPTIONS] [DIRECTORY]`
 - `dusk git graph [theme]`
+- `dusk git log [theme]`
 - `dusk git status|viz [theme]`
 - `dusk diff [theme] [--staged]`
 - `dusk themes list`
@@ -32,6 +33,7 @@ Navigation:
 - `-d`: directories only
 - `-a`: include hidden files/directories
 - `-e, --exclude <pattern>`: add exclusion pattern (repeatable)
+- `-I <pattern>`: tree-compatible alias for exclude
 
 Display:
 - `-i`: show metadata (permission bits + modified timestamp)
@@ -40,6 +42,7 @@ Display:
 - `--theme <name>`: `default | nord | gruvbox | dracula | solarized | catppuccin | tokyonight | onedark | monokai | kanagawa | everforest | rose-pine | ayu | nightfox`
 - `--tests`: highlight test files/directories
 - `--count`: show per-directory file counts
+- `--noreport`: hide the final summary line
 
 Inspect files:
 - `-c, --cat <ext...>`: print file content for matching extensions
@@ -99,6 +102,7 @@ Output formats:
 - `-a, --all`: show hidden files
 - `-l, --long`: long listing (perms, size, timestamp)
 - `--no-icons`: disable Nerd Font icons
+- `--basic`: classic plain output (no colors/icons)
 - `--sort <mode>`: `name | size | time`
 - `-r, --reverse`: reverse sorting
 - `--theme <name>`: `default | nord | gruvbox | dracula | solarized | catppuccin | tokyonight | onedark | monokai | kanagawa | everforest | rose-pine | ayu | nightfox`
@@ -107,6 +111,7 @@ Output formats:
 ### Examples
 
 - `dusk ls`
+- `dusk ls --basic`
 - `dusk ls -la`
 - `dusk ls -l --sort time`
 
@@ -142,7 +147,10 @@ Output formats:
 ## `git` Subcommand
 
 ### `dusk git graph [theme]`
-Shows decorated graph history (`git log --graph --decorate --oneline --all`).
+Alias of `dusk git log [theme]`.
+
+### `dusk git log [theme]`
+Shows an informative graph history (`hash`, refs, subject, author, relative time) with VSCode-style focus.
 
 ### `dusk git status [theme]`
 Shows branch + split panels for:
@@ -156,7 +164,7 @@ Alias of `status`.
 ## `diff` Subcommand
 
 ### `dusk diff [theme] [--staged]`
-Shows colorful git diff (`--word-diff=color`), optionally staged changes.
+Shows side-by-side git diff with old/new line numbers, optionally staged changes.
 
 ## `themes` Subcommand
 
@@ -200,6 +208,7 @@ These pass arguments through to installed tools.
   - Icon rendering uses an expanded developer-focused Nerd Font icon library shared across commands.
   - `cat` behaves like basic cat by default; `bat` alias enables pretty mode by default.
   - `ls` accepts common built-in flags (`-a`, `-l`, `-r`, `-t`, `-S`, `-h`, `--color`).
+  - Default theme is `tokyonight` with high-visibility colors (gray/dim palette avoided).
 
 - Wrappers that still depend on system binaries:
   - `find` and `rg` subcommands require `find` and (`rg` or `grep`) in `PATH`.
