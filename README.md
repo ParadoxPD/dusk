@@ -1,42 +1,72 @@
 # dusk
 
-`dusk` is a single terminal tool that combines:
+![Rust](https://img.shields.io/badge/rust-2024%20edition-orange)
+![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macOS%20%7C%20windows-blue)
+![Theme](https://img.shields.io/badge/default%20theme-onedark--pro-2ea043)
+![Commands](https://img.shields.io/badge/native%20commands-tree%20%7C%20ls%20%7C%20cat%20%7C%20xtree%20%7C%20git%20%7C%20diff-purple)
 
-- native Rust reimplementations of `tree` / `eza` (`ls`) / `bat` (`cat`)
-- `find` / `ripgrep` workflows
-- a built-in enhanced tree engine (`xtree`) with themes + Nerd Font icons
-- git graph visualization + git status panel
-- colorful git diff output
-- terminal-capability-aware ANSI coloring (no ANSI escape leakage in pipes/redirection)
+`dusk` is a single terminal toolkit that combines:
 
-See `FEATURES.md` for the complete command and flag reference.
-See `TESTING.md` for tests, benchmarks, and coverage commands.
+- native Rust reimplementations of `tree` / eza-style `ls` / bat-style `cat`
+- enhanced project inspection (`xtree`) with themes, icons, stats, and exports
+- git graph/status/diff views plus a full interactive TUI
+- find/grep workflows (`find`, `rg` passthrough wrappers)
+- terminal-capability-aware ANSI color behavior (no ANSI leakage in non-TTY output)
 
-## Commands
+See `FEATURES.md` for complete flags and workflows.
+See `TESTING.md` for tests, benchmarks, and coverage.
+
+## Quick Start
 
 ```bash
-dusk xtree [xtree-options...]
-dusk tree [tree-options...]
-dusk find [find-options...]
-dusk rg [ripgrep-options...]
-dusk ls [native-ls-options...]
-dusk cat [native-cat-options...]
+cargo build --release
+./target/release/dusk help
+
+# interactive git panel
+./target/release/dusk git tui
+```
+
+## Command Map
+
+```bash
+dusk help
+
+dusk xtree [OPTIONS] [DIRECTORY]
+dusk tree [OPTIONS] [DIRECTORY]
+dusk ls [OPTIONS] [DIRECTORY]
+dusk cat [OPTIONS] [FILE]...
+dusk bat [OPTIONS] [FILE]...
 
 dusk git log [theme]
 dusk git graph [theme]
 dusk git status [theme]
+dusk git viz [theme]
+dusk git tui [theme]
+
 dusk diff [theme] [--staged]
 dusk themes list
+
+dusk find [args...]
+dusk rg [args...]
 ```
 
-## Xtree Help
+## Git TUI Highlights
 
-```bash
-dusk xtree --tldr
-dusk xtree --help
-```
+`dusk git tui` now includes:
+
+- tabs: `Workspace`, `Graph`, `CommitDiff`
+- interactive staging and unstaging (including untracked files)
+- commit creation, branch create/switch, push workflows
+- upstream visibility in header (shows tracking branch if present)
+- remote push support to explicit target branch
+- command palette (`Ctrl+P` / `P`) with filtering
+- centered help overlay and command-mode help (`:cmdhelp`)
+- vim-style navigation + mouse wheel scroll support
+- blinking input cursor in command/input modes
 
 ## Themes
+
+Available themes:
 
 ```text
 default, nord, gruvbox, dracula, solarized, catppuccin, tokyonight, onedark-pro, monokai, kanagawa, everforest, rose-pine, ayu, nightfox
@@ -44,17 +74,23 @@ default, nord, gruvbox, dracula, solarized, catppuccin, tokyonight, onedark-pro,
 
 Default theme: `onedark-pro`
 
-## Notes
+## Project Stats
 
-- `dusk tree`, `dusk ls`, and `dusk cat` are native Rust implementations (no `tree`, `eza`, or `bat` subprocesses).
-- `dusk cat` defaults to basic `cat`-style plain output and supports stdin.
-- `dusk bat` is an alias that defaults to pretty, themed, line-numbered output.
-- `dusk ls` defaults to eza-style colorful/icon-rich output (TTY) and supports common `ls` flags (`-a`, `-l`, `-r`, `-t`, `-S`, `-h`, `--color`) with aligned long-format columns.
-- `dusk ls --basic` switches to classic plain output.
-- `dusk find` uses system `find`.
-- `dusk rg` uses `rg` if installed, otherwise falls back to system `grep`.
-- `dusk xtree` is implemented in pure Rust (no embedded shell script).
-- `dusk diff` renders side-by-side output with old/new line numbers.
-- `dusk git log` provides a rich commit graph view similar to VSCode-style history visuals.
-- Colors are automatically disabled for non-interactive output (`NO_COLOR`, non-TTY, `TERM=dumb`), so redirected/piped output stays clean.
-- Set `DUSK_COLOR=always` (or `CLICOLOR_FORCE=1`) to force color rendering, including help screens.
+- Language: Rust (Edition 2024)
+- Native command families: 6 (`tree`, `ls`, `cat`, `xtree`, `git`, `diff`)
+- Theme count: 14
+- Interactive Git TUI modules: 4 (`mod.rs`, `actions.rs`, `input.rs`, `render.rs`)
+- Test suites: unit tests + CLI integration tests
+
+## Color and Pipe Safety
+
+- Colors are enabled only for interactive terminals by default.
+- In non-TTY output, `TERM=dumb`, or when `NO_COLOR` is set, ANSI is disabled.
+- This prevents escape-code leakage into redirected files and pipelines.
+- Force color with `DUSK_COLOR=always` or `CLICOLOR_FORCE=1`.
+
+## Compatibility Notes
+
+- `tree`/`ls`/`cat` are native Rust implementations and do not shell out to `tree`, `eza`, or `bat`.
+- `find` and `rg` are passthrough wrappers and require binaries in `PATH`.
+- `rg` falls back to `grep` if `rg` is unavailable.

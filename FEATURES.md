@@ -1,246 +1,246 @@
 # Dusk Features
 
-`dusk` is a single CLI with native Rust features (`tree`, `ls`, `cat`, `xtree`, `git`, `diff`, `themes`) plus targeted wrappers (`find`, `rg`).
+`dusk` is a unified CLI with native Rust command implementations plus focused passthrough wrappers.
 
 ## Command Overview
 
 - `dusk help`
 - `dusk xtree [OPTIONS] [DIRECTORY]`
-- `dusk git graph [theme]`
+- `dusk tree [OPTIONS] [DIRECTORY]`
+- `dusk ls [OPTIONS] [DIRECTORY]`
+- `dusk cat [OPTIONS] [FILE]...`
+- `dusk bat [OPTIONS] [FILE]...`
 - `dusk git log [theme]`
+- `dusk git graph [theme]`
 - `dusk git status|viz [theme]`
 - `dusk git tui|interactive [theme]`
 - `dusk diff [theme] [--staged]`
 - `dusk themes list`
-- `dusk tree [args...]`
 - `dusk find [args...]`
 - `dusk rg [args...]`
-- `dusk ls [args...]`
-- `dusk cat [args...]`
 
-## `xtree` (Native Rust)
+## xtree (Native Rust)
 
-Use this for the full enhanced tree/inspection/analysis workflow.
+Use `xtree` for enhanced tree + inspection + analysis.
 
-### Help
-
+Help:
 - `dusk xtree --help`
 - `dusk xtree --tldr`
-
-### Flags
 
 Navigation:
 - `-L <depth>`: limit recursion depth
 - `-d`: directories only
 - `-a`: include hidden files/directories
-- `-e, --exclude <pattern>`: add exclusion pattern (repeatable)
+- `-e, --exclude <pattern>`: exclusion pattern (repeatable)
 - `-I <pattern>`: tree-compatible alias for exclude
 
 Display:
-- `-i`: show metadata (permission bits + modified timestamp)
+- `-i`: metadata (permissions + modified time)
 - `-s`: hide file sizes
 - `--no-icon`: disable Nerd Font icons
-- `--theme <name>`: `default | nord | gruvbox | dracula | solarized | catppuccin | tokyonight | onedark-pro | monokai | kanagawa | everforest | rose-pine | ayu | nightfox`
+- `--theme <name>`
 - `--tests`: highlight test files/directories
-- `--count`: show per-directory file counts
-- `--noreport`: hide the final summary line
+- `--count`: per-directory file counts
+- `--noreport`: hide final summary line
 
 Inspect files:
-- `-c, --cat <ext...>`: print file content for matching extensions
-- `-g, --grep <pattern>`: print up to first 5 matches per file
-- `--clip <n>`: max printed lines per file (default: `100`)
+- `-c, --cat <ext...>`: print matching file contents
+- `-g, --grep <pattern>`: print first 5 matches per file
+- `--clip <n>`: limit printed lines (default `100`)
 - `--no-clip`, `--nc`: disable clipping
 
 Filtering:
-- `--no-git`: disable `.gitignore` filtering
-- `--no-treeignore`: disable `.treeignore` filtering
-- `--focus <ext...>`: only keep dirs/files containing matching extensions
+- `--no-git`: disable `.gitignore`
+- `--no-treeignore`: disable `.treeignore`
+- `--focus <ext...>`: only keep directories/files with matching extensions
 
 Analysis:
 - `--stats`: extension/language counts
 - `--big`: mark files larger than 5 MB
-- `--dupes`: detect duplicates via content hash
-- `--audit`: basic security checks (permissions/executable/secrets)
+- `--dupes`: duplicate detection by content hash
+- `--audit`: permission/executable/secret checks
 - `--fingerprint`: project summary report
 
 Organization:
 - `--sort <mode>`: `name | size | time`
-- `--group`: grouped output by extension
+- `--group`: grouped by extension
 - `--resolve`: resolve symlink targets
 
-Output formats:
-- `--md`: markdown export
+Output:
+- `--md`: Markdown export
 - `--json`: JSON export
-- `--prompt`: AI-friendly dump, saved to OS temp dir as `tree_prompt.txt`
+- `--prompt`: AI-friendly dump to temp file
 
-### Examples
-
-- `dusk xtree`
-- `dusk xtree -L 2 --theme nord`
-- `dusk xtree -g TODO -c rs ts --clip 80`
-- `dusk xtree --stats --big --dupes`
-- `dusk xtree --fingerprint`
-- `dusk xtree --json > tree.json`
-- `dusk xtree --md > tree.md`
-- `dusk xtree --prompt`
-
-## `tree` Subcommand (Native Rust)
+## tree Subcommand (Native Rust)
 
 - `dusk tree [OPTIONS] [DIRECTORY]`
-- Uses the same native engine as `xtree` (same flags/features).
-- Quick help:
-  - `dusk tree --tldr`
-  - `dusk tree --help`
+- Uses the same native engine as `xtree`.
 
-## `ls` Subcommand (Native Rust, eza-style)
+## ls Subcommand (Native Rust, eza-style)
 
-### Usage
-
+Usage:
 - `dusk ls [OPTIONS] [DIRECTORY]`
 
-### Flags
-
-- `-a, --all`: show hidden files
-- `-l, --long`: long listing (perms, size, timestamp)
-- `--no-icons`: disable Nerd Font icons
-- `--basic`: classic plain output (no colors/icons)
+Flags:
+- `-a, --all`: show hidden entries
+- `-l, --long`: long format
+- `--no-icons`: disable icons
+- `--basic`: classic plain output
 - `--sort <mode>`: `name | size | time`
 - `-r, --reverse`: reverse sorting
-- `--theme <name>`: `default | nord | gruvbox | dracula | solarized | catppuccin | tokyonight | onedark-pro | monokai | kanagawa | everforest | rose-pine | ayu | nightfox`
-- `-h, --help`: help
+- `--theme <name>`
+- `-h, --help`
 
-### Examples
+Notes:
+- Supports common built-in style flags (`-a`, `-l`, `-r`, `-t`, `-S`, `-h`, `--color`).
+- Long format keeps aligned column margins.
 
-- `dusk ls`
-- `dusk ls --basic`
-- `dusk ls -la`
-- `dusk ls -l --sort time`
+## cat and bat Subcommands (Native Rust)
 
-## `cat` Subcommand (Native Rust, bat-style)
-
-### Usage
-
+Usage:
 - `dusk cat [OPTIONS] <FILE>...`
-- `dusk cat [OPTIONS]` (reads stdin when no files are provided)
+- `dusk cat [OPTIONS]` (stdin)
 - `dusk bat [OPTIONS] [FILE]...` (pretty-first alias)
 
-### Flags
+Flags:
+- `-n, --number`
+- `--no-number`
+- `-p, --plain`
+- `--pretty`
+- `--theme <name>`
+- `-b` (number nonblank)
+- `-s` (squeeze blank lines)
+- `-E` (show line end marker)
+- `-T` (show tabs)
+- `-h, --help`
 
-- `-n, --number`: show line numbers
-- `--no-number`: hide line numbers
-- `-p, --plain`: disable color styling
-- `--theme <name>`: `default | nord | gruvbox | dracula | solarized | catppuccin | tokyonight | onedark-pro | monokai | kanagawa | everforest | rose-pine | ayu | nightfox`
-- `-h, --help`: help
-- `--pretty`: force bat-like pretty mode
-- `-b`: number nonblank lines
-- `-s`: squeeze repeated blank lines
-- `-E`: show `$` at line end
-- `-T`: show tabs as `^I`
+## git Subcommand
 
-### Examples
+### Non-interactive
 
-- `dusk cat src/main.rs`
-- `dusk cat --no-number README.md`
-- `dusk cat -p Cargo.toml`
-- `printf 'a\\n\\n\\tb\\n' | dusk cat -n -E -T -s`
-- `dusk bat src/main.rs`
+- `dusk git graph [theme]` and `dusk git log [theme]`:
+  informative commit graph output.
+- `dusk git status [theme]` and `dusk git viz [theme]`:
+  staged/modified/untracked panel.
 
-## `git` Subcommand
+### Interactive TUI
 
-### `dusk git graph [theme]`
-Alias of `dusk git log [theme]`.
+- `dusk git tui [theme]`
+- `dusk git interactive [theme]`
 
-### `dusk git log [theme]`
-Shows an informative graph history (`hash`, refs, subject, author, relative time) with VSCode-style focus.
+Core capabilities:
+- stage/unstage selected and all files
+- commit message entry and commit
+- branch create and switch
+- push current branch
+- push to explicit remote branch
+- upstream branch detection and display
+- graph tab + commit-diff tab
 
-### `dusk git status [theme]`
-Shows branch + split panels for:
-- staged
-- modified
-- untracked
-
-### `dusk git viz [theme]`
-Alias of `status`.
-
-### `dusk git tui [theme]`
-Interactive Git TUI panel with vim-style navigation and command mode.
-
-Key workflows:
-- Stage/unstage selected files (including untracked)
-- Stage all / unstage all
-- Enter commit message and commit directly
-- Push current branch (`origin/<branch>`)
-- Create branch and switch branch
-- Integrated status + log graph + selected-file diff panes
-- Built-in help overlay and `:` command mode help
+Tabs:
+- `1`: Workspace
+- `2`: Graph
+- `3`: CommitDiff
 
 Primary keys:
-- `j/k`, `Up/Down`: move selection
-- `g/G`: first/last item
-- `h/l`, `Left/Right`, `Tab`: switch panes
-- `s/u`: stage/unstage selected file
-- `A/U`: stage all / unstage all
-- `c`: commit message input
+- `j/k`, `Up/Down`: move/scroll
+- `g/G`: top/bottom
+- `h/l`, `Left/Right`, `Tab`: pane switch in workspace tab
+- `s/u`: stage/unstage selected
+- `A/U`: stage all/unstage all
+- `c`: commit input mode
+- `b/B`: create branch / switch branch input modes
 - `p`: push current branch
-- `b/B`: create branch / switch branch
+- `R`: push remote branch input mode
+- `t`: cycle theme
+- `Ctrl+P` or `P`: command palette
 - `:`: command mode
-- `?`: in-app help
+- `?`: centered help overlay
 - `q`: quit
 
-## `diff` Subcommand
+Input modes:
+- commit: `commit msg: ...`
+- branch create: `new branch: ...`
+- branch switch: `switch branch: ...`
+- remote push: `push remote branch: ...` (example `origin main`)
+- command: `:...`
 
-### `dusk diff [theme] [--staged]`
-Shows side-by-side git diff with old/new line numbers, optionally staged changes.
+Command mode commands:
+- `help`
+- `cmdhelp` / `commands`
+- `refresh` / `r`
+- `stage`
+- `unstage`
+- `stage-all`
+- `unstage-all`
+- `commit <msg>`
+- `push`
+- `push-remote <remote>/<branch>`
+- `push-remote <remote> <branch>`
+- `branch <name>`
+- `switch <name>`
+- `workspace`
+- `graph-tab` / `graphview`
+- `commitdiff` / `commit-diff`
+- `theme <name>`
+- `themes`
+- `palette`
+- `quit` / `exit`
 
-## `themes` Subcommand
+Palette:
+- command search/filter
+- cyclic selection
+- Enter to execute
+- includes theme switch entries
 
-### `dusk themes list`
-Lists available theme names.
+Mouse:
+- scroll wheel support for active tab and palette
+
+UI rendering:
+- centered modal overlays (help/palette)
+- compact layout for narrow terminals (`<100` columns)
+- synchronized frame updates to reduce flicker
+- blinking cursor in input/palette modes
+
+Code organization:
+- `src/commands/git/tui/mod.rs`
+- `src/commands/git/tui/actions.rs`
+- `src/commands/git/tui/input.rs`
+- `src/commands/git/tui/render.rs`
+
+## diff Subcommand
+
+- `dusk diff [theme] [--staged]`
+- Side-by-side git diff with line numbers.
+
+## themes Subcommand
+
+- `dusk themes list`
 
 ## Wrapper Subcommands
 
-These pass arguments through to installed tools.
-
 - `dusk find [args...]` -> system `find`
-- `dusk rg [args...]` -> `rg` if installed, otherwise system `grep`
+- `dusk rg [args...]` -> `rg` if present, else system `grep`
 
-## OS Support Matrix
+## Theme Catalog
 
-### Native features (`xtree`, `git`, `diff`, `themes`)
+`default | nord | gruvbox | dracula | solarized | catppuccin | tokyonight | onedark-pro | monokai | kanagawa | everforest | rose-pine | ayu | nightfox`
+
+Default: `onedark-pro`
+
+## OS Support
 
 - Linux: supported
 - macOS: supported
 - Windows: supported
 
-### Notes by feature
+Cross-platform notes:
+- ANSI output is TTY-aware and disabled for non-interactive output by default.
+- Prompt export path uses system temp directory.
+- Unix permission checks in `--audit` are limited on Windows.
+- Symlink behavior depends on filesystem and permissions.
 
-- ANSI color safety:
-  - Color is enabled only for interactive terminals.
-  - On non-TTY output, `TERM=dumb`, or when `NO_COLOR` is set, ANSI escapes are disabled.
-  - This prevents escape-code leakage into pipes, redirected files, and copied plain text.
-  - Override with `DUSK_COLOR=always` or `CLICOLOR_FORCE=1` when you explicitly want forced colors.
+## Known Gaps / Non-goals
 
-- Prompt export path:
-  - Implemented cross-platform via system temp directory (`std::env::temp_dir()`).
-
-- File permission security checks (`--audit`):
-  - Linux/macOS: world-writable and executable checks are supported.
-  - Windows: Unix permission bits do not exist in the same format. Dusk still runs secret-pattern scanning, but Unix-style permission checks are skipped.
-
-- Symlink resolution (`--resolve`):
-  - Works where the OS/filesystem exposes symlink metadata and resolution permissions.
-
-- Native replacements:
-  - `tree`/`ls`/`cat` are implemented from scratch in Rust, so they do not depend on `tree`, `eza`, or `bat`.
-  - Icon rendering uses an expanded developer-focused Nerd Font icon library shared across commands.
-  - `cat` behaves like basic cat by default; `bat` alias enables pretty mode by default.
-  - `ls` accepts common built-in flags (`-a`, `-l`, `-r`, `-t`, `-S`, `-h`, `--color`).
-  - Default theme is `onedark-pro` with high-visibility colors (gray/dim palette avoided).
-
-- Wrappers that still depend on system binaries:
-  - `find` and `rg` subcommands require `find` and (`rg` or `grep`) in `PATH`.
-
-## Known Gaps / Explicit Non-Goals
-
-- Dusk intentionally keeps `find`/`rg` as wrappers to avoid reimplementing full search engines.
-- Clipboard copy for `--prompt` is not implemented yet; file output to temp dir is implemented for all OSs.
+- `find`/`rg` remain wrappers rather than full native search-engine replacements.
+- Clipboard auto-copy for prompt export is not implemented.
