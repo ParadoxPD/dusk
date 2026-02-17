@@ -2,6 +2,7 @@ use std::fs;
 use std::hint::black_box;
 use std::path::PathBuf;
 use std::process::Command;
+use std::process::Stdio;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use tempfile::tempdir;
@@ -25,6 +26,8 @@ fn run_bin(args: &[&str]) {
     let status = Command::new(bench_bin())
         .args(args)
         .env("DUSK_COLOR", "never")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .status()
         .expect("run dusk");
     assert!(status.success());

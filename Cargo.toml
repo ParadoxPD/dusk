@@ -22,3 +22,10 @@ tempfile = "3.23.0"
 [[bench]]
 name = "commands"
 harness = false
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
