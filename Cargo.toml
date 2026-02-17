@@ -1,0 +1,14 @@
+[package]
+name = "dusk"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+atty = "0.2.14"
+chrono = "0.4.42"
+globset = "0.4.16"
+ignore = "0.4.25"
+libc = "0.2.182"
+md5 = "0.8.0"
+serde_json = "1.0.145"
+walkdir = "2.5.0"

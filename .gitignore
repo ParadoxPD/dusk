@@ -1,0 +1,70 @@
+# =========================
+# Rust / Cargo
+# =========================
+/target/
+**/*.rs.bk
+
+# Keep Cargo.lock for binaries, ignore for libraries.
+# This project is a binary, so Cargo.lock should be tracked.
+# Uncomment the next line only if you convert this repo to a library crate.
+# Cargo.lock
+
+# =========================
+# Build / Coverage / Profiling
+# =========================
+*.log
+*.tmp
+*.out
+*.profraw
+*.profdata
+*.gcda
+*.gcno
+*.lcov
+coverage/
+
+# cargo-tarpaulin / llvm-cov outputs
+/tarpaulin-report.html
+/cobertura.xml
+
+# =========================
+# Environment / Secrets
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Editor / IDE
+# =========================
+.vscode/
+.idea/
+*.iml
+
+# JetBrains
+**/.idea/
+
+# Vim / Neovim
+*.swp
+*.swo
+*~
+
+# =========================
+# OS-specific
+# =========================
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# =========================
+# Temporary / Local tools
+# =========================
+/tmp/
+*.pid
+
+# =========================
+# Optional local config files
+# =========================
+.treeignore.local
