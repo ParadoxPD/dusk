@@ -102,6 +102,14 @@ impl App {
                 }
                 _ => {}
             },
+            Some(Overlay::Push) => match key.code {
+                KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => {
+                    self.overlay = None;
+                    self.push_overlay_lines.clear();
+                    self.push_overlay_ok = None;
+                }
+                _ => {}
+            },
             Some(Overlay::Palette) => match key.code {
                 KeyCode::Esc => self.overlay = None,
                 KeyCode::Enter => return self.execute_palette_selection(),

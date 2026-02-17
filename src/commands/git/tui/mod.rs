@@ -42,6 +42,7 @@ enum InputMode {
 enum Overlay {
     Help,
     Palette,
+    Push,
 }
 
 #[derive(Clone)]
@@ -122,6 +123,8 @@ struct App {
     diff_lines: Vec<String>,
     commit_diff_lines: Vec<String>,
     commit_diff_scroll: usize,
+    push_overlay_lines: Vec<String>,
+    push_overlay_ok: Option<bool>,
 }
 
 struct TerminalGuard;

@@ -122,6 +122,7 @@ impl App {
             match overlay {
                 Overlay::Help => self.render_help_overlay(&mut out, w, h)?,
                 Overlay::Palette => self.render_palette_overlay(&mut out, w, h, cursor_on)?,
+                Overlay::Push => self.render_push_overlay(&mut out, w, h)?,
             }
         }
 
@@ -455,6 +456,37 @@ impl App {
         }
 
         self.draw_center_overlay(out, w, h, " Command Palette ", &lines)
+    }
+
+    fn render_push_overlay(&self, out: &mut io::Stdout, w: usize, h: usize) -> Result<(), String> {
+        let mut lines: Vec<(String, &'static str)> = Vec::new();
+        let status_color = match self.push_overlay_ok {
+            Some(true) => self.theme.ok,
+            Some(false) => self.theme.warn,
+            None => self.theme.accent,
+        };
+        let status_text = match self.push_overlay_ok {
+            Some(true) => "Status: success",
+            Some(false) => "Status: failed",
+            None => "Status: running",
+        };
+        lines.push((status_text.to_string(), status_color));
+        lines.push(("".to_string(), self.theme.info));
+
+        for line in &self.push_overlay_lines {
+            let color = if line.starts_with("$ git ") {
+                self.theme.number
+            } else if line.contains("failed") || line.contains("error") {
+                self.theme.warn
+            } else if line.contains("success") || line.contains("completed") {
+                self.theme.ok
+            } else {
+                self.theme.info
+            };
+            lines.push((line.clone(), color));
+        }
+
+        self.draw_center_overlay(out, w, h, " Push ", &lines)
     }
 
     fn draw_center_overlay(

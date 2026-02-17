@@ -28,6 +28,8 @@ impl App {
                 "Select a commit in Graph tab (j/k), then open CommitDiff tab".to_string(),
             ],
             commit_diff_scroll: 0,
+            push_overlay_lines: Vec::new(),
+            push_overlay_ok: None,
         }
     }
 
@@ -266,8 +268,16 @@ impl App {
             return Ok(());
         }
 
-        git_status(&["push", "-u", "origin", &branch])?;
-        self.status_msg = format!("Pushed branch {branch}");
+        let refspec = format!("HEAD:{branch}");
+        self.run_push_with_overlay(
+            format!("Pushing current branch to origin/{branch}"),
+            vec![
+                "push".to_string(),
+                "-u".to_string(),
+                "origin".to_string(),
+                refspec,
+            ],
+        )?;
         Ok(())
     }
 
@@ -282,13 +292,64 @@ impl App {
             return Ok(());
         }
         let refspec = format!("HEAD:{branch}");
+        let mut args = vec!["push".to_string()];
         if set_upstream {
-            git_status(&["push", "-u", remote, &refspec])?;
-        } else {
-            git_status(&["push", remote, &refspec])?;
+            args.push("-u".to_string());
         }
-        self.status_msg = format!("Pushed to {remote}/{branch}");
-        self.refresh()?;
+        args.push(remote.to_string());
+        args.push(refspec);
+
+        self.run_push_with_overlay(format!("Pushing to {remote}/{branch}"), args)?;
+        Ok(())
+    }
+
+    fn run_push_with_overlay(&mut self, what: String, args: Vec<String>) -> Result<(), String> {
+        self.overlay = Some(Overlay::Push);
+        self.push_overlay_ok = None;
+        self.push_overlay_lines = vec![
+            what,
+            format!("$ git {}", args.join(" ")),
+            "Running push... input is blocked until completion.".to_string(),
+        ];
+        self.render(true)?;
+
+        let output = Command::new("git")
+            .args(args.iter().map(String::as_str))
+            .output()
+            .map_err(|e| format!("git push failed to start: {e}"))?;
+
+        let ok = output.status.success();
+        self.push_overlay_ok = Some(ok);
+        self.push_overlay_lines = vec![if ok {
+            "Push completed successfully.".to_string()
+        } else {
+            "Push failed.".to_string()
+        }];
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let mut details = stdout
+            .lines()
+            .chain(stderr.lines())
+            .filter(|l| !l.trim().is_empty())
+            .take(14)
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        if details.is_empty() {
+            details.push("No additional output from git push.".to_string());
+        }
+        self.push_overlay_lines.extend(details);
+        self.push_overlay_lines
+            .push("Press Enter or Esc to close.".to_string());
+
+        if ok {
+            self.status_msg = "Push completed".to_string();
+            let _ = self.refresh();
+        } else {
+            self.status_msg = "Push failed (see overlay)".to_string();
+        }
+
+        self.render(true)?;
         Ok(())
     }
 
