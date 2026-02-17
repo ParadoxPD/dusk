@@ -9,12 +9,30 @@ pub fn run(args: &[String]) -> Result<(), String> {
     if args.iter().any(|a| a == "-h" || a == "--help") {
         let theme = theme::active(None);
         let style = Style::for_stdout();
+        let cmd = |s: &str| style.paint(theme.title, s);
+        let opt = |s: &str| style.paint(theme.accent, s);
+        let arg = |s: &str| style.paint(theme.ok, s);
+        let desc = |s: &str| style.paint(theme.info, s);
         println!(
             "{}",
-            style.paint(
-                theme.title,
-                "dusk diff (side-by-side git diff with line numbers)\n\nUSAGE\n  dusk diff [theme] [--staged]\n\nFLAGS\n  --staged    Show staged changes\n  -h, --help  Show this help\n",
-            )
+            cmd("dusk diff (side-by-side git diff with line numbers)")
+        );
+        println!();
+        println!("{}", opt("USAGE"));
+        println!(
+            "  {} {} {}",
+            opt("dusk"),
+            cmd("diff"),
+            arg("[theme] [--staged]")
+        );
+        println!();
+        println!("{}", opt("FLAGS"));
+        println!("  {} {}", opt("--staged"), desc("Show staged changes"));
+        println!(
+            "  {}, {} {}",
+            opt("-h"),
+            opt("--help"),
+            desc("Show this help")
         );
         return Ok(());
     }

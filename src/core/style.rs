@@ -12,12 +12,18 @@ impl Style {
     pub fn for_stdout() -> Self {
         let tty = atty::is(Stream::Stdout);
         let no_color = env::var_os("NO_COLOR").is_some();
+        let force_color = env::var("DUSK_COLOR")
+            .map(|v| v.eq_ignore_ascii_case("always"))
+            .unwrap_or(false)
+            || env::var("CLICOLOR_FORCE")
+                .map(|v| v == "1")
+                .unwrap_or(false);
         let term_dumb = env::var("TERM")
             .map(|v| v.eq_ignore_ascii_case("dumb"))
             .unwrap_or(false);
 
-        let color = tty && !no_color && !term_dumb;
-        let icons = tty;
+        let color = (tty && !no_color && !term_dumb) || force_color;
+        let icons = tty || force_color;
 
         Self { color, icons }
     }

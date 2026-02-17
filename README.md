@@ -56,3 +56,4 @@ Default theme: `tokyonight`
 - `dusk diff` renders side-by-side output with old/new line numbers.
 - `dusk git log` provides a rich commit graph view similar to VSCode-style history visuals.
 - Colors are automatically disabled for non-interactive output (`NO_COLOR`, non-TTY, `TERM=dumb`), so redirected/piped output stays clean.
+- Set `DUSK_COLOR=always` (or `CLICOLOR_FORCE=1`) to force color rendering, including help screens.

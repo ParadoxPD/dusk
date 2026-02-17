@@ -155,17 +155,66 @@ fn parse(args: &[OsString], default_mode: Mode) -> Result<Opts, String> {
 }
 
 fn print_help() {
+    let style = Style::for_stdout();
     let theme = theme::active(None);
+    let cmd = |s: &str| style.paint(theme.title, s);
+    let opt = |s: &str| style.paint(theme.accent, s);
+    let arg = |s: &str| style.paint(theme.ok, s);
+    let desc = |s: &str| style.paint(theme.info, s);
     println!(
-        "{}dusk cat{} (cat-compatible, with optional bat-style pretty mode)\n\n{}USAGE{}\n  dusk cat [OPTIONS] [FILE]...\n  dusk bat [OPTIONS] [FILE]...\n\n{}CAT-COMPAT FLAGS{}\n  -n               Number all output lines\n  -b               Number nonblank output lines\n  -s               Squeeze multiple blank lines\n  -E               Display $ at end of each line\n  -T               Display TAB as ^I\n\n{}PRETTY FLAGS{}\n  --pretty         Enable bat-like pretty output\n  --plain, -p      Force plain cat-like output\n  --no-number      Disable line numbers in pretty mode\n  --theme <name>   Theme for pretty mode\n  -h, --help       Show this help\n",
-        theme.title,
-        theme.reset,
-        theme.accent,
-        theme.reset,
-        theme.accent,
-        theme.reset,
-        theme.accent,
-        theme.reset,
+        "{}",
+        cmd("dusk cat (cat-compatible, with optional bat-style pretty mode)")
+    );
+    println!();
+    println!("{}", opt("USAGE"));
+    println!(
+        "  {} {} {}",
+        opt("dusk"),
+        cmd("cat"),
+        arg("[OPTIONS] [FILE]...")
+    );
+    println!(
+        "  {} {} {}",
+        opt("dusk"),
+        cmd("bat"),
+        arg("[OPTIONS] [FILE]...")
+    );
+    println!();
+    println!("{}", opt("CAT-COMPAT FLAGS"));
+    println!("  {} {}", opt("-n"), desc("Number all output lines"));
+    println!("  {} {}", opt("-b"), desc("Number nonblank output lines"));
+    println!("  {} {}", opt("-s"), desc("Squeeze multiple blank lines"));
+    println!("  {} {}", opt("-E"), desc("Display $ at end of each line"));
+    println!("  {} {}", opt("-T"), desc("Display TAB as ^I"));
+    println!();
+    println!("{}", opt("PRETTY FLAGS"));
+    println!(
+        "  {} {}",
+        opt("--pretty"),
+        desc("Enable bat-like pretty output")
+    );
+    println!(
+        "  {}, {} {}",
+        opt("--plain"),
+        opt("-p"),
+        desc("Force plain cat-like output")
+    );
+    println!(
+        "  {} {}",
+        opt("--no-number"),
+        desc("Disable line numbers in pretty mode")
+    );
+    println!(
+        "  {} {} {}",
+        opt("--theme"),
+        arg("<name>"),
+        desc("Theme for pretty mode")
+    );
+    println!(
+        "  {}, {} {}",
+        opt("-h"),
+        opt("--help"),
+        desc("Show this help")
     );
 }
 

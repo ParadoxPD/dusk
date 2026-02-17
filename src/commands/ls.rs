@@ -230,17 +230,85 @@ fn parse(args: &[OsString]) -> Result<Opts, String> {
 }
 
 fn print_help() {
+    let style = Style::for_stdout();
     let theme = theme::active(None);
+    let cmd = |s: &str| style.paint(theme.title, s);
+    let opt = |s: &str| style.paint(theme.accent, s);
+    let arg = |s: &str| style.paint(theme.ok, s);
+    let desc = |s: &str| style.paint(theme.info, s);
+    println!("{}", cmd("dusk ls (ls-compatible, eza-style enhancements)"));
+    println!();
+    println!("{}", opt("USAGE"));
     println!(
-        "{}dusk ls{} (ls-compatible, eza-style enhancements)\n\n{}USAGE{}\n  dusk ls [OPTIONS] [FILE|DIR]...\n\n{}COMMON FLAGS{}\n  -a, --all            Include hidden files\n  -l, --long           Long listing format\n  -r, --reverse        Reverse sort order\n  -t                   Sort by modification time\n  -S                   Sort by file size\n  -h, --human-readable Human-readable sizes in long mode\n  --color=<when>       auto | always | never\n\n{}ENHANCED FLAGS{}\n  --icons              Enable Nerd Font icons (default)\n  --no-icons           Disable icons\n  --basic              Classic plain ls output (no color, no icons)\n  --theme <name>       Select color theme\n  --sort <mode>        name | size | time\n  -h, --help           Show this help\n",
-        theme.title,
-        theme.reset,
-        theme.accent,
-        theme.reset,
-        theme.accent,
-        theme.reset,
-        theme.accent,
-        theme.reset
+        "  {} {} {}",
+        opt("dusk"),
+        cmd("ls"),
+        arg("[OPTIONS] [FILE|DIR]...")
+    );
+    println!();
+    println!("{}", opt("COMMON FLAGS"));
+    println!(
+        "  {}, {} {}",
+        opt("-a"),
+        opt("--all"),
+        desc("Include hidden files")
+    );
+    println!(
+        "  {}, {} {}",
+        opt("-l"),
+        opt("--long"),
+        desc("Long listing format")
+    );
+    println!(
+        "  {}, {} {}",
+        opt("-r"),
+        opt("--reverse"),
+        desc("Reverse sort order")
+    );
+    println!("  {} {}", opt("-t"), desc("Sort by modification time"));
+    println!("  {} {}", opt("-S"), desc("Sort by file size"));
+    println!(
+        "  {}, {} {}",
+        opt("-h"),
+        opt("--human-readable"),
+        desc("Human-readable sizes in long mode")
+    );
+    println!(
+        "  {}={} {}",
+        opt("--color"),
+        arg("<when>"),
+        desc("auto | always | never")
+    );
+    println!();
+    println!("{}", opt("ENHANCED FLAGS"));
+    println!(
+        "  {} {}",
+        opt("--icons"),
+        desc("Enable Nerd Font icons (default)")
+    );
+    println!("  {} {}", opt("--no-icons"), desc("Disable icons"));
+    println!(
+        "  {} {}",
+        opt("--basic"),
+        desc("Classic plain ls output (no color, no icons)")
+    );
+    println!(
+        "  {} {} {}",
+        opt("--theme"),
+        arg("<name>"),
+        desc("Select color theme")
+    );
+    println!(
+        "  {} {} {}",
+        opt("--sort"),
+        arg("<mode>"),
+        desc("name | size | time")
+    );
+    println!(
+        "  {}, {} {}",
+        opt("-h"),
+        opt("--help"),
+        desc("Show this help")
     );
 }
 

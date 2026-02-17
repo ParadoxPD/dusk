@@ -192,6 +192,7 @@ These pass arguments through to installed tools.
   - Color is enabled only for interactive terminals.
   - On non-TTY output, `TERM=dumb`, or when `NO_COLOR` is set, ANSI escapes are disabled.
   - This prevents escape-code leakage into pipes, redirected files, and copied plain text.
+  - Override with `DUSK_COLOR=always` or `CLICOLOR_FORCE=1` when you explicitly want forced colors.
 
 - Prompt export path:
   - Implemented cross-platform via system temp directory (`std::env::temp_dir()`).

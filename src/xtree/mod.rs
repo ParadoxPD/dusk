@@ -24,11 +24,11 @@ pub fn run(args: &[OsString]) -> Result<(), String> {
     let cfg = Config::parse(args)?;
 
     if cfg.help {
-        print!("{}", help::full_help());
+        print!("{}", help::full_help(Some(cfg.theme.as_str())));
         return Ok(());
     }
     if cfg.tldr {
-        print!("{}", help::tldr_help());
+        print!("{}", help::tldr_help(Some(cfg.theme.as_str())));
         return Ok(());
     }
 

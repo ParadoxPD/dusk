@@ -4,6 +4,35 @@ use crate::core::style::Style;
 use crate::core::theme;
 
 pub fn run(args: &[String]) -> Result<(), String> {
+    if args.iter().any(|a| a == "-h" || a == "--help") {
+        let t = theme::active(None);
+        let s = Style::for_stdout();
+        let cmd = |x: &str| s.paint(t.title, x);
+        let opt = |x: &str| s.paint(t.accent, x);
+        let arg = |x: &str| s.paint(t.ok, x);
+        let desc = |x: &str| s.paint(t.info, x);
+        println!("{}", cmd("dusk git (enhanced git visualizer)"));
+        println!();
+        println!("{}", opt("USAGE"));
+        println!("  {} {} {}", opt("dusk"), cmd("git log"), arg("[theme]"));
+        println!("  {} {} {}", opt("dusk"), cmd("git graph"), arg("[theme]"));
+        println!("  {} {} {}", opt("dusk"), cmd("git status"), arg("[theme]"));
+        println!("  {} {} {}", opt("dusk"), cmd("git viz"), arg("[theme]"));
+        println!();
+        println!("{}", opt("DESCRIPTION"));
+        println!(
+            "  {} {}",
+            cmd("git log/graph"),
+            desc("Informative commit graph (VSCode-style)")
+        );
+        println!(
+            "  {} {}",
+            cmd("git status/viz"),
+            desc("Staged/modified/untracked panel")
+        );
+        return Ok(());
+    }
+
     let sub = args.first().map(|s| s.as_str()).unwrap_or("graph");
 
     match sub {
