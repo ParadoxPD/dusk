@@ -48,6 +48,14 @@ fn bench_ls(c: &mut Criterion) {
     c.bench_function("cmd_ls_long", |b| {
         b.iter(|| run_bin(&["ls", "-l", black_box(dir.as_str())]))
     });
+
+    c.bench_function("cmd_ls_long_headers_author", |b| {
+        b.iter(|| run_bin(&["ls", "-lH", "--author", black_box(dir.as_str())]))
+    });
+
+    c.bench_function("cmd_ls_almost_all", |b| {
+        b.iter(|| run_bin(&["ls", "-A", black_box(dir.as_str())]))
+    });
 }
 
 fn bench_cat_and_bat(c: &mut Criterion) {

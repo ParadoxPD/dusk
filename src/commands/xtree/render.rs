@@ -235,11 +235,102 @@ fn print_single_item(
     } else if is_executable(md) {
         println!("{}{}{}*{}", theme.exec, icon, name, theme.reset);
     } else {
-        println!("{}{}{}{}", theme.file, icon, name, theme.reset);
+        let color = file_category_color(path, theme);
+        println!("{}{}{}{}", color, icon, name, theme.reset);
     }
 
     let _ = root;
     Ok(())
+}
+
+fn file_category_color<'a>(path: &Path, theme: &'a Theme) -> &'a str {
+    let name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+
+    if matches!(
+        ext.as_str(),
+        "rs" | "go"
+            | "py"
+            | "js"
+            | "jsx"
+            | "ts"
+            | "tsx"
+            | "java"
+            | "c"
+            | "cpp"
+            | "h"
+            | "hpp"
+            | "cs"
+            | "rb"
+            | "php"
+            | "swift"
+            | "kt"
+            | "kts"
+            | "scala"
+            | "dart"
+            | "lua"
+            | "sh"
+            | "bash"
+            | "zsh"
+            | "fish"
+            | "sql"
+    ) {
+        return theme.content; // source code / scripts
+    }
+
+    if matches!(
+        ext.as_str(),
+        "json" | "yaml" | "yml" | "toml" | "ini" | "conf" | "xml" | "env" | "lock"
+    ) || name.starts_with(".env")
+        || name == "dockerfile"
+    {
+        return theme.meta; // config
+    }
+
+    if matches!(
+        ext.as_str(),
+        "md" | "markdown" | "txt" | "rst" | "org" | "pdf" | "doc" | "docx"
+    ) {
+        return theme.header; // docs
+    }
+
+    if matches!(
+        ext.as_str(),
+        "png" | "jpg" | "jpeg" | "gif" | "svg" | "webp" | "bmp" | "ico"
+    ) {
+        return theme.count; // images/assets
+    }
+
+    if matches!(
+        ext.as_str(),
+        "mp3" | "wav" | "ogg" | "mp4" | "mov" | "mkv" | "avi"
+    ) {
+        return theme.warn; // media
+    }
+
+    if matches!(
+        ext.as_str(),
+        "zip" | "tar" | "gz" | "rar" | "7z" | "xz" | "bz2" | "tgz"
+    ) {
+        return theme.size; // archives
+    }
+
+    if matches!(
+        ext.as_str(),
+        "csv" | "tsv" | "parquet" | "db" | "sqlite" | "sqlite3"
+    ) {
+        return theme.dir; // data files
+    }
+
+    theme.file
 }
 
 fn metadata_str(md: &Metadata) -> String {

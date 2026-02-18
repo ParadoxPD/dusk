@@ -35,6 +35,102 @@ fn ls_help_has_basic_flag() {
 }
 
 #[test]
+fn ls_h_is_human_not_help() {
+    let td = tempdir().expect("tmpdir");
+    fs::write(td.path().join("a.txt"), "x").expect("write");
+
+    dusk()
+        .args(["ls", "-lh", td.path().to_string_lossy().as_ref()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--help").not());
+}
+
+#[test]
+fn ls_all_shows_implied_dot_entries_and_almost_all_hides_them() {
+    let td = tempdir().expect("tmpdir");
+    fs::write(td.path().join(".hidden"), "x").expect("write hidden");
+    fs::write(td.path().join("visible"), "x").expect("write visible");
+
+    dusk()
+        .args(["ls", "-a", "--basic", td.path().to_string_lossy().as_ref()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("./"))
+        .stdout(predicate::str::contains("../"));
+
+    dusk()
+        .args(["ls", "-A", "--basic", td.path().to_string_lossy().as_ref()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("./").not())
+        .stdout(predicate::str::contains("../").not());
+}
+
+#[test]
+fn ls_headers_and_author_columns_are_printed() {
+    let td = tempdir().expect("tmpdir");
+    fs::write(td.path().join("file.txt"), "hello").expect("write file");
+
+    dusk()
+        .args([
+            "ls",
+            "-lH",
+            "--author",
+            td.path().to_string_lossy().as_ref(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("PERMS"))
+        .stdout(predicate::str::contains("OWNER"))
+        .stdout(predicate::str::contains("AUTHOR"))
+        .stdout(predicate::str::contains("MODIFIED"));
+}
+
+#[test]
+fn ls_file_type_does_not_append_exec_star() {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let td = tempdir().expect("tmpdir");
+        let p = td.path().join("runme");
+        fs::write(&p, "echo hi\n").expect("write");
+        let mut perms = fs::metadata(&p).expect("meta").permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&p, perms).expect("chmod");
+
+        dusk()
+            .args([
+                "ls",
+                "--file-type",
+                "--basic",
+                td.path().to_string_lossy().as_ref(),
+            ])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("runme*").not());
+    }
+}
+
+#[test]
+fn ls_sort_by_ext_works() {
+    let td = tempdir().expect("tmpdir");
+    fs::write(td.path().join("a.rs"), "fn main(){}\n").expect("write");
+    fs::write(td.path().join("b.md"), "# t\n").expect("write");
+
+    dusk()
+        .args([
+            "ls",
+            "--sort",
+            "ext",
+            "--basic",
+            td.path().to_string_lossy().as_ref(),
+        ])
+        .assert()
+        .success();
+}
+
+#[test]
 fn cat_plain_reads_stdin() {
     dusk()
         .arg("cat")

@@ -83,17 +83,25 @@ Usage:
 
 Flags:
 - `-a, --all`: show hidden entries
+- `-A, --almost-all`: show hidden entries except implied `.` and `..`
 - `-l, --long`: long format
+- `-H`: print column headers
 - `--no-icons`: disable icons
 - `--basic`: classic plain output
 - `--sort <mode>`: `name | size | time`
 - `-r, --reverse`: reverse sorting
+- `--file-type`: append file type indicators, but do not append executable `*`
+- `--author`: with `-l`, print author column
 - `--theme <name>`
-- `-h, --help`
+- `-h, --human-readable`: human-readable sizes
+- `-?, --help`
 
 Notes:
 - Supports common built-in style flags (`-a`, `-l`, `-r`, `-t`, `-S`, `-h`, `--color`).
 - Long format keeps aligned column margins.
+- Long format timestamp: `DD Mon HH:MM`.
+- `-a` includes implied `.` and `..` entries at top, while `-A` omits them.
+- `--sort` supports: `name|size|time|owner|author|type|ext`.
 
 ## cat and bat Subcommands (Native Rust)
 
@@ -203,10 +211,24 @@ UI rendering:
 - blinking cursor in input/palette modes
 
 Code organization:
-- `src/commands/git/tui/mod.rs`
-- `src/commands/git/tui/actions.rs`
-- `src/commands/git/tui/input.rs`
-- `src/commands/git/tui/render.rs`
+- Commands are module-scoped by directory for easier refactoring:
+  - `src/commands/cat/mod.rs`
+  - `src/commands/diff/mod.rs`
+  - `src/commands/git/mod.rs`
+  - `src/commands/ls/mod.rs`
+  - `src/commands/passthrough/mod.rs`
+  - `src/commands/themes/mod.rs`
+  - `src/commands/tree/mod.rs`
+  - `src/commands/xtree/mod.rs`
+- Git TUI internals:
+  - `src/commands/git/tui/mod.rs`
+  - `src/commands/git/tui/actions.rs`
+  - `src/commands/git/tui/input.rs`
+  - `src/commands/git/tui/render.rs`
+- Convention for future commands:
+  - Add new command implementations under `src/commands/<new-command>/`.
+  - Keep shared utilities in `src/core/`.
+  - Keep `src/app.rs` as command router only.
 
 ## diff Subcommand
 

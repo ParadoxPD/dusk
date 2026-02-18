@@ -82,6 +82,12 @@ Default theme: `onedark-pro`
 - Interactive Git TUI modules: 4 (`mod.rs`, `actions.rs`, `input.rs`, `render.rs`)
 - Test suites: unit tests + CLI integration tests
 
+## Architecture Convention
+
+- Every CLI command is implemented under `src/commands/<command>/` as a module directory.
+- `src/app.rs` only routes commands and does not hold command implementation logic.
+- Future commands should follow the same module-directory rule for easier refactoring and ownership boundaries.
+
 ## Color and Pipe Safety
 
 - Colors are enabled only for interactive terminals by default.
@@ -94,3 +100,11 @@ Default theme: `onedark-pro`
 - `tree`/`ls`/`cat` are native Rust implementations and do not shell out to `tree`, `eza`, or `bat`.
 - `find` and `rg` are passthrough wrappers and require binaries in `PATH`.
 - `rg` falls back to `grep` if `rg` is unavailable.
+- `ls` updates:
+  - `-h` is human-readable size (not help); use `--help` or `-?` for help.
+  - `-H` enables column headers.
+  - `-a` includes implied `.` and `..` entries at the top.
+  - `-A` (`--almost-all`) includes hidden entries but omits implied `.` and `..`.
+  - `--author` prints author column in long view.
+  - `--file-type` appends file type markers without executable `*`.
+  - `--sort` supports `name|size|time|owner|author|type|ext`.

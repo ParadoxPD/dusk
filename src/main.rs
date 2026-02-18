@@ -1,7 +1,6 @@
 mod app;
 mod commands;
 mod core;
-mod xtree;
 
 fn main() {
     #[cfg(unix)]
