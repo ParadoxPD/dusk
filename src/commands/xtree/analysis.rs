@@ -10,7 +10,9 @@ use super::theme::{Theme, format_size};
 #[derive(Default)]
 pub struct Stats {
     pub lang_stats: HashMap<String, usize>,
+    pub loc_stats: HashMap<String, u64>,
     pub total_size: u64,
+    pub total_loc: u64,
     pub dir_count: usize,
     pub file_count: usize,
 }
@@ -36,6 +38,14 @@ pub fn collect_stats(root: &Path, cfg: &Config, ignore: &IgnoreMatcher) -> Resul
             .unwrap_or("no-ext")
             .to_ascii_lowercase();
         *stats.lang_stats.entry(ext).or_insert(0) += 1;
+        let ext_key = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("no-ext")
+            .to_ascii_lowercase();
+        let loc = count_lines(path);
+        *stats.loc_stats.entry(ext_key).or_insert(0) += loc;
+        stats.total_loc += loc;
 
         if let Ok(md) = fs::metadata(path) {
             stats.total_size += md.len();
@@ -47,6 +57,15 @@ pub fn collect_stats(root: &Path, cfg: &Config, ignore: &IgnoreMatcher) -> Resul
 pub fn print_stats(stats: &Stats, theme: &Theme) {
     println!();
     println!("{}=== Language Statistics ==={}", theme.header, theme.reset);
+    println!(
+        "{}Total LOC: {}{}",
+        theme.meta, stats.total_loc, theme.reset
+    );
+    println!(
+        "{}Total Files: {}{}",
+        theme.meta, stats.file_count, theme.reset
+    );
+    println!();
     let mut v = stats
         .lang_stats
         .iter()
@@ -55,8 +74,22 @@ pub fn print_stats(stats: &Stats, theme: &Theme) {
     v.sort_by(|a, b| b.1.cmp(&a.1));
 
     for (ext, count) in v {
-        println!("{}  .{}: {} files{}", theme.meta, ext, count, theme.reset);
+        let loc = stats.loc_stats.get(&ext).copied().unwrap_or(0);
+        println!(
+            "{}  .{}: {} files, {} LOC{}",
+            theme.meta, ext, count, loc, theme.reset
+        );
     }
+}
+
+pub fn loc_for_extensions(stats: &Stats, exts: &[String]) -> u64 {
+    if exts.is_empty() {
+        return 0;
+    }
+    exts.iter()
+        .map(|ext| ext.trim_start_matches('.').to_ascii_lowercase())
+        .map(|ext| stats.loc_stats.get(&ext).copied().unwrap_or(0))
+        .sum()
 }
 
 pub type DuplicateMap = HashMap<String, Vec<PathBuf>>;
@@ -208,6 +241,10 @@ pub fn print_fingerprint(
         format_size(stats.total_size),
         theme.reset
     );
+    println!(
+        "{}🧾 Total LOC: {}{}",
+        theme.meta, stats.total_loc, theme.reset
+    );
 
     let mut max_depth = 0usize;
     let fp_walker = walkdir::WalkDir::new(root)
@@ -281,6 +318,22 @@ pub fn print_fingerprint(
     }
 
     Ok(())
+}
+
+fn count_lines(path: &Path) -> u64 {
+    match fs::read(path) {
+        Ok(bytes) => {
+            if bytes.is_empty() {
+                return 0;
+            }
+            let mut lines = bytes.iter().filter(|&&b| b == b'\n').count() as u64;
+            if *bytes.last().unwrap_or(&b'\n') != b'\n' {
+                lines += 1;
+            }
+            lines
+        }
+        Err(_) => 0,
+    }
 }
 
 pub fn audit_file(path: &Path, theme: &Theme) {

@@ -38,7 +38,7 @@ pub fn tldr_help(theme_name: Option<&str>) -> String {
         "  {} {} {}\n",
         opt("dusk"),
         cmd("xtree"),
-        arg("--stats --big --dupes")
+        arg("--stats --loc --big --dupes")
     ));
     out.push_str(&format!(
         "  {} {} {}\n",
@@ -195,6 +195,11 @@ pub fn full_help(theme_name: Option<&str>) -> String {
     ));
     out.push_str(&format!(
         "  {} {}\n",
+        opt("--loc"),
+        desc("Show total lines of code (LOC)")
+    ));
+    out.push_str(&format!(
+        "  {} {}\n",
         opt("--big"),
         desc("Mark files larger than 5 MB")
     ));
@@ -274,7 +279,7 @@ pub fn full_help(theme_name: Option<&str>) -> String {
         "  {} {} {}\n",
         opt("dusk"),
         cmd("xtree"),
-        arg("--stats --big --dupes")
+        arg("--stats --loc --big --dupes")
     ));
     out.push_str(&format!(
         "  {} {} {}\n",

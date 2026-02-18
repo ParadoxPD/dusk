@@ -193,6 +193,53 @@ fn tree_noreport_hides_summary_line() {
 }
 
 #[test]
+fn xtree_loc_prints_total_loc() {
+    let td = tempdir().expect("tmpdir");
+    fs::create_dir_all(td.path().join("src")).expect("mkdir");
+    fs::write(td.path().join("src/main.rs"), "fn main() {}\nlet x = 1;\n").expect("write");
+
+    dusk()
+        .args(["xtree", "--loc", td.path().to_string_lossy().as_ref()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Total LOC:"));
+}
+
+#[test]
+fn xtree_stats_includes_loc_column() {
+    let td = tempdir().expect("tmpdir");
+    fs::write(td.path().join("a.rs"), "fn a() {}\n").expect("write");
+    fs::write(td.path().join("b.rs"), "fn b() {}\n").expect("write");
+
+    dusk()
+        .args(["xtree", "--stats", td.path().to_string_lossy().as_ref()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Total LOC:"))
+        .stdout(predicate::str::contains("LOC"));
+}
+
+#[test]
+fn xtree_loc_with_cat_exts_prints_filtered_loc() {
+    let td = tempdir().expect("tmpdir");
+    fs::write(td.path().join("a.rs"), "fn a() {}\n").expect("write");
+    fs::write(td.path().join("b.md"), "# heading\nline\n").expect("write");
+
+    dusk()
+        .args([
+            "xtree",
+            "--loc",
+            td.path().to_string_lossy().as_ref(),
+            "-c",
+            "rs",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Total LOC:"))
+        .stdout(predicate::str::contains("LOC for -c [rs]: 1"));
+}
+
+#[test]
 fn ls_basic_disables_ansi_even_when_forced() {
     dusk()
         .env("DUSK_COLOR", "always")

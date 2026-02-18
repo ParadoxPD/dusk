@@ -31,7 +31,7 @@ This document outlines all `dusk` subcommands, flags, and compatibility notes.
   - `-i`, `-s`, `--no-icon`, `--theme <name>`, `--tests`, `--count`, `--noreport`
   - `-c|--cat <ext...>`, `-g|--grep <pattern>`, `--clip <n>`, `--no-clip|--nc`
   - `--no-git`, `--no-treeignore`, `--focus <ext...>`
-  - `--stats`, `--big`, `--dupes`, `--audit`, `--fingerprint`
+  - `--stats`, `--loc`, `--big`, `--dupes`, `--audit`, `--fingerprint`
   - `--sort <name|size|time>`, `--group`, `--resolve`
   - `--md`, `--json`, `--prompt`
 

@@ -92,6 +92,7 @@ impl Runtime {
                 Ok(())
             }
             Mode::Normal => {
+                let mut filtered_loc_summary: Option<(String, u64)> = None;
                 println!(
                     "{}{}{}",
                     self.theme.dir,
@@ -114,9 +115,22 @@ impl Runtime {
                     }
                 }
 
-                if self.cfg.show_stats {
+                if self.cfg.show_stats || self.cfg.show_loc {
                     let stats = collect_stats(&self.root, &self.cfg, &self.ignore)?;
-                    analysis::print_stats(&stats, &self.theme);
+                    if self.cfg.show_stats {
+                        analysis::print_stats(&stats, &self.theme);
+                    } else {
+                        println!();
+                        println!(
+                            "{}Total LOC: {}{}",
+                            self.theme.header, stats.total_loc, self.theme.reset
+                        );
+                    }
+                    if !self.cfg.cat_exts.is_empty() {
+                        let selected_loc = analysis::loc_for_extensions(&stats, &self.cfg.cat_exts);
+                        let label = self.cfg.cat_exts.join(", ");
+                        filtered_loc_summary = Some((label, selected_loc));
+                    }
                 }
 
                 if self.cfg.find_dupes {
@@ -139,6 +153,14 @@ impl Runtime {
                             analysis::audit_file(path, &self.theme);
                         }
                     });
+                }
+
+                if let Some((label, loc)) = filtered_loc_summary {
+                    println!();
+                    println!(
+                        "{}LOC for -c [{}]: {}{}",
+                        self.theme.header, label, loc, self.theme.reset
+                    );
                 }
                 Ok(())
             }

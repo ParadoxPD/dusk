@@ -93,6 +93,11 @@ impl IgnoreMatcher {
     }
 
     pub fn is_ignored(&self, path: &Path, is_dir: bool, show_hidden: bool) -> bool {
+        let rel = path.strip_prefix(&self.root).unwrap_or(path);
+        if rel.as_os_str().is_empty() {
+            return false;
+        }
+
         let name = path
             .file_name()
             .and_then(|n| n.to_str())
@@ -125,7 +130,6 @@ impl IgnoreMatcher {
             return true;
         }
 
-        let rel = path.strip_prefix(&self.root).unwrap_or(path);
         if self.user_globs.is_match(rel) || self.user_globs.is_match(path) {
             return true;
         }

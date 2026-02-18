@@ -30,6 +30,7 @@ pub struct Config {
     pub grep_pattern: Option<String>,
     pub use_gitignore: bool,
     pub show_stats: bool,
+    pub show_loc: bool,
     pub prompt_mode: bool,
     pub highlight_big: bool,
     pub big_threshold: u64,
@@ -66,6 +67,7 @@ impl Default for Config {
             grep_pattern: None,
             use_gitignore: true,
             show_stats: false,
+            show_loc: false,
             prompt_mode: false,
             highlight_big: false,
             big_threshold: 5 * 1024 * 1024,
@@ -141,6 +143,7 @@ impl Config {
                 "--no-treeignore" => cfg.use_treeignore = false,
                 "--no-icon" => cfg.show_icons = false,
                 "--stats" => cfg.show_stats = true,
+                "--loc" => cfg.show_loc = true,
                 "--md" => cfg.mode = Mode::Markdown,
                 "--json" => cfg.mode = Mode::Json,
                 "--clip" => {
@@ -227,9 +230,11 @@ mod tests {
             OsString::from("--json"),
             OsString::from("--sort"),
             OsString::from("time"),
+            OsString::from("--loc"),
         ];
         let cfg = Config::parse(&args).expect("parse");
         assert!(matches!(cfg.mode, Mode::Json));
         assert!(matches!(cfg.sort_mode, SortMode::Time));
+        assert!(cfg.show_loc);
     }
 }

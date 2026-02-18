@@ -11,6 +11,7 @@
 ## Highlights
 
 - Native Rust implementations for `tree` (`xtree`), `ls` (`eza` alias), `cat`, and `bat`-style view
+- Native LOC reporting in `xtree` (`--loc`) and LOC-aware `--stats`
 - Full-color theming with terminal-capability-aware ANSI behavior (no ANSI leakage on pipes/files)
 - Git graph/status + interactive TUI with tabs, palette, overlays, staging/commit/push/branch operations
 - Side-by-side git diff with line numbers

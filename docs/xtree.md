@@ -14,7 +14,7 @@ dusk tree [OPTIONS] [DIRECTORY]
 ```bash
 dusk xtree --tldr
 dusk xtree -L 2 --theme onedark-pro
-dusk xtree --stats --big --dupes
+dusk xtree --stats --loc --big --dupes
 dusk xtree --json > tree.json
 ```
 
@@ -54,6 +54,7 @@ dusk xtree --json > tree.json
 ### Analysis
 
 - `--stats`: extension/language statistics
+- `--loc`: total lines of code (LOC) summary
 - `--big`: mark large files (>5MB)
 - `--dupes`: duplicate detection by content hash
 - `--audit`: security checks (permissions + secret hints)
@@ -77,6 +78,7 @@ dusk xtree --json > tree.json
 dusk xtree
 dusk xtree -L 3 --count --tests
 dusk xtree -g TODO -c rs toml
+dusk xtree --loc
 dusk xtree --focus rs ts --sort time
 dusk xtree --fingerprint --dupes
 ```
