@@ -1,10 +1,19 @@
 use std::fs;
+use std::process::Command;
 
 use predicates::prelude::*;
 use tempfile::tempdir;
 
 fn dusk() -> assert_cmd::Command {
     assert_cmd::Command::new(env!("CARGO_BIN_EXE_dusk"))
+}
+
+fn command_available(bin: &str) -> bool {
+    Command::new(bin).arg("--version").output().is_ok()
+}
+
+fn has_disassembler() -> bool {
+    command_available("objdump") || command_available("llvm-objdump")
 }
 
 #[test]
@@ -247,4 +256,89 @@ fn rg_requires_rg_or_grep_binary() {
         .stderr(predicate::str::contains(
             "required system binary `rg` or `grep`",
         ));
+}
+
+#[test]
+fn dump_hex_outputs_offsets() {
+    let td = tempdir().expect("tmpdir");
+    let p = td.path().join("bin.dat");
+    fs::write(&p, [0x41_u8, 0x42, 0x00, 0xff]).expect("write");
+
+    dusk()
+        .args(["dump", "--hex", p.to_string_lossy().as_ref()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("00000000"));
+}
+
+#[test]
+fn dump_default_mode_is_hex_only() {
+    let td = tempdir().expect("tmpdir");
+    let p = td.path().join("bin.dat");
+    fs::write(&p, [0x41_u8, 0x42, 0x00, 0xff]).expect("write");
+
+    dusk()
+        .args(["dump", p.to_string_lossy().as_ref()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("-- HEX --"))
+        .stdout(predicate::str::contains("-- ASM --").not());
+}
+
+#[test]
+fn dump_asm_mode_is_asm_only_when_disassembler_available() {
+    if !has_disassembler() {
+        return;
+    }
+
+    dusk()
+        .args(["dump", "--asm", env!("CARGO_BIN_EXE_dusk")])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("-- ASM --"))
+        .stdout(predicate::str::contains("-- HEX --").not());
+}
+
+#[test]
+fn dump_hex_and_asm_together_show_both_when_disassembler_available() {
+    if !has_disassembler() {
+        return;
+    }
+
+    dusk()
+        .args(["dump", "--hex", "--asm", env!("CARGO_BIN_EXE_dusk")])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("-- HEX --"))
+        .stdout(predicate::str::contains("-- ASM --"));
+}
+
+#[test]
+fn dump_asm_requires_objdump_or_llvm_objdump() {
+    let td = tempdir().expect("tmpdir");
+    let p = td.path().join("bin.dat");
+    fs::write(&p, [0x41_u8, 0x42]).expect("write");
+
+    dusk()
+        .env("PATH", "/definitely/missing/path")
+        .args(["dump", "--asm", p.to_string_lossy().as_ref()])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "required system binary `objdump` or `llvm-objdump`",
+        ));
+}
+
+#[test]
+fn bat_lexical_highlighting_marks_keywords_when_forced_color() {
+    let td = tempdir().expect("tmpdir");
+    let p = td.path().join("sample.rs");
+    fs::write(&p, "fn main() { let x = 42; }\n").expect("write");
+
+    dusk()
+        .env("DUSK_COLOR", "always")
+        .args(["bat", "--no-number", p.to_string_lossy().as_ref()])
+        .assert()
+        .success()
+        .stdout(predicate::str::is_match("\\x1b\\[[0-9;]*mfn\\x1b\\[0m").unwrap());
 }

@@ -44,6 +44,7 @@ dusk git viz [theme]
 dusk git tui [theme]
 
 dusk diff [theme] [--staged]
+dusk dump [--hex|--asm|--both] [--theme <name>] <file>...
 dusk themes list
 
 dusk find [args...]
@@ -98,6 +99,7 @@ Default theme: `onedark-pro`
 ## Compatibility Notes
 
 - `tree`/`ls`/`cat` are native Rust implementations and do not shell out to `tree`, `eza`, or `bat`.
+- `dump` is native for hex view; assembly mode uses `objdump`/`llvm-objdump` when available.
 - `find` and `rg` are passthrough wrappers and require binaries in `PATH`.
 - `rg` falls back to `grep` if `rg` is unavailable.
 - `ls` updates:

@@ -350,23 +350,117 @@ fn stylize_line(line: &str, path: Option<&Path>, style: &Style, theme: theme::Th
         return style.paint(theme.warn, line);
     }
 
-    if looks_like_decl(trimmed) {
-        return style.paint(theme.info, line);
-    }
-
-    style.paint(theme.subtle, line)
+    lexical_highlight(line, &ext, style, theme)
 }
 
-fn looks_like_decl(line: &str) -> bool {
-    let decls = [
-        "fn ",
-        "pub fn ",
-        "struct ",
-        "enum ",
-        "impl ",
-        "class ",
-        "interface ",
-        "type ",
-    ];
-    decls.iter().any(|d| line.starts_with(d))
+fn lexical_highlight(line: &str, ext: &str, style: &Style, theme: theme::Theme) -> String {
+    let keywords = match ext {
+        "rs" => &[
+            "fn", "let", "mut", "pub", "impl", "struct", "enum", "trait", "mod", "use", "match",
+            "if", "else", "for", "while", "loop", "return",
+        ][..],
+        "go" => &[
+            "func",
+            "var",
+            "const",
+            "type",
+            "struct",
+            "interface",
+            "package",
+            "import",
+            "if",
+            "else",
+            "for",
+            "range",
+            "return",
+            "switch",
+            "case",
+        ][..],
+        "py" => &[
+            "def", "class", "import", "from", "if", "elif", "else", "for", "while", "return",
+            "match", "case", "with", "as", "try", "except",
+        ][..],
+        "js" | "ts" | "jsx" | "tsx" => &[
+            "function",
+            "const",
+            "let",
+            "var",
+            "class",
+            "import",
+            "from",
+            "export",
+            "if",
+            "else",
+            "for",
+            "while",
+            "return",
+            "async",
+            "await",
+            "interface",
+            "type",
+        ][..],
+        "s" | "asm" => &[
+            "mov", "lea", "add", "sub", "mul", "div", "call", "ret", "jmp", "je", "jne", "cmp",
+            "push", "pop",
+        ][..],
+        _ => &[][..],
+    };
+
+    let mut out = String::new();
+    let mut token = String::new();
+    let mut in_string = false;
+    let mut string_delim = '\0';
+
+    let flush_token = |tok: &mut String, out: &mut String| {
+        if tok.is_empty() {
+            return;
+        }
+        let t = tok.as_str();
+        let painted = if keywords.iter().any(|k| *k == t) {
+            style.paint(theme.accent, t)
+        } else if t.starts_with("0x") || t.chars().all(|c| c.is_ascii_digit()) {
+            style.paint(theme.number, t)
+        } else if ext == "s" || ext == "asm" {
+            if t.starts_with('r') || ["eax", "ebx", "ecx", "edx"].contains(&t) {
+                style.paint(theme.ok, t)
+            } else {
+                style.paint(theme.subtle, t)
+            }
+        } else {
+            style.paint(theme.subtle, t)
+        };
+        out.push_str(&painted);
+        tok.clear();
+    };
+
+    for ch in line.chars() {
+        if in_string {
+            token.push(ch);
+            if ch == string_delim {
+                out.push_str(&style.paint(theme.warn, token.clone()));
+                token.clear();
+                in_string = false;
+            }
+            continue;
+        }
+
+        if ch == '"' || ch == '\'' {
+            flush_token(&mut token, &mut out);
+            in_string = true;
+            string_delim = ch;
+            token.push(ch);
+            continue;
+        }
+
+        if ch.is_alphanumeric() || ch == '_' || ch == 'x' {
+            token.push(ch);
+            continue;
+        }
+
+        flush_token(&mut token, &mut out);
+        out.push_str(&style.paint(theme.info, ch.to_string()));
+    }
+    flush_token(&mut token, &mut out);
+
+    out
 }

@@ -15,6 +15,7 @@
 - `dusk git status|viz [theme]`
 - `dusk git tui|interactive [theme]`
 - `dusk diff [theme] [--staged]`
+- `dusk dump [--hex|--asm|--both] [--theme <name>] <file>...`
 - `dusk themes list`
 - `dusk find [args...]`
 - `dusk rg [args...]`
@@ -121,6 +122,27 @@ Flags:
 - `-E` (show line end marker)
 - `-T` (show tabs)
 - `-h, --help`
+
+Highlighting approach:
+- Uses lightweight lexical/token highlighting by extension (no AST).
+- Highlights comments, common keywords, numbers, and strings.
+- Includes basic assembly token coloring (mnemonics, registers, immediates).
+
+## dump Subcommand (Hex + Assembly)
+
+Usage:
+- `dusk dump [OPTIONS] <FILE>...`
+
+Flags:
+- `--hex`: show hex dump
+- `--asm`: show assembly dump
+- `--both`: show hex and assembly
+- `--theme <name>`: set theme
+- `-?, --help`
+
+Notes:
+- Hex mode is native Rust.
+- Assembly mode requires `objdump` or `llvm-objdump` in `PATH` and returns clear errors if missing.
 
 ## git Subcommand
 

@@ -100,6 +100,12 @@ fn bench_themes(c: &mut Criterion) {
     });
 }
 
+fn bench_dump_help(c: &mut Criterion) {
+    c.bench_function("cmd_dump_help", |b| {
+        b.iter(|| run_bin(&[black_box("dump"), black_box("--help")]))
+    });
+}
+
 criterion_group!(
     benches,
     bench_help,
@@ -107,6 +113,7 @@ criterion_group!(
     bench_cat_and_bat,
     bench_tree_and_xtree,
     bench_git_and_diff_help,
-    bench_themes
+    bench_themes,
+    bench_dump_help
 );
 criterion_main!(benches);

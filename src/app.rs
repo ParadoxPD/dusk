@@ -15,10 +15,6 @@ pub fn run(argv: Vec<String>) -> Result<(), String> {
     };
 
     match cmd.as_str() {
-        "tree" => {
-            let tree_args: Vec<OsString> = args.map(OsString::from).collect();
-            commands::tree::run(&tree_args)
-        }
         "ls" | "eza" => {
             let ls_args: Vec<OsString> = args.map(OsString::from).collect();
             commands::ls::run(&ls_args)
@@ -35,7 +31,7 @@ pub fn run(argv: Vec<String>) -> Result<(), String> {
             let passthrough_args: Vec<OsString> = args.map(OsString::from).collect();
             commands::passthrough::run(&cmd, &passthrough_args)
         }
-        "xtree" => {
+        "xtree" | "tree" => {
             let xtree_args: Vec<OsString> = args.map(OsString::from).collect();
             commands::xtree::run(&xtree_args)
         }
@@ -46,6 +42,10 @@ pub fn run(argv: Vec<String>) -> Result<(), String> {
         "diff" => {
             let diff_args: Vec<String> = args.collect();
             commands::diff::run(&diff_args)
+        }
+        "dump" => {
+            let dump_args: Vec<OsString> = args.map(OsString::from).collect();
+            commands::dump::run(&dump_args)
         }
         "themes" => {
             let sub = args.next();
@@ -148,6 +148,13 @@ fn print_help() {
         desc("# Side-by-side git diff with line numbers")
     );
     println!(
+        "  {} {} {}         {}",
+        opt("dusk"),
+        cmd("dump"),
+        arg("[--hex|--asm|--both] <file>..."),
+        desc("# Colorful hex + assembly dumper")
+    );
+    println!(
         "  {} {} {}           {}",
         opt("dusk"),
         cmd("themes"),
@@ -177,6 +184,12 @@ fn print_help() {
     println!("  {} {} {}", opt("dusk"), cmd("ls"), arg("-laht"));
     println!("  {} {} {}", opt("dusk"), cmd("cat"), arg("src/main.rs"));
     println!("  {} {} {}", opt("dusk"), cmd("bat"), arg("src/main.rs"));
+    println!(
+        "  {} {} {}",
+        opt("dusk"),
+        cmd("dump"),
+        arg("--both target/release/dusk")
+    );
     println!("  {} {} {}", opt("dusk"), cmd("git log"), arg(""));
     println!("  {} {} {}", opt("dusk"), cmd("git tui"), arg(""));
 }
