@@ -216,3 +216,35 @@ fn unknown_command_fails() {
         .failure()
         .stderr(predicate::str::contains("unknown command"));
 }
+
+#[test]
+fn git_requires_git_binary() {
+    dusk()
+        .env("PATH", "/definitely/missing/path")
+        .args(["git", "status"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("required system binary `git`"));
+}
+
+#[test]
+fn find_requires_find_binary() {
+    dusk()
+        .env("PATH", "/definitely/missing/path")
+        .args(["find", "."])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("required system binary `find`"));
+}
+
+#[test]
+fn rg_requires_rg_or_grep_binary() {
+    dusk()
+        .env("PATH", "/definitely/missing/path")
+        .args(["rg", "main", "."])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "required system binary `rg` or `grep`",
+        ));
+}

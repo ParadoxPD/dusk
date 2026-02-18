@@ -1,6 +1,8 @@
 use std::cmp;
 use std::process::Command;
 
+use crate::core::process;
+
 use super::*;
 
 impl App {
@@ -731,6 +733,7 @@ fn parse_porcelain(s: &str) -> Vec<FileStatus> {
 }
 
 pub(super) fn git_capture(args: &[&str]) -> Result<String, String> {
+    process::ensure_command_exists("git", "dusk git tui")?;
     let output = Command::new("git")
         .args(args)
         .output()
@@ -744,6 +747,7 @@ pub(super) fn git_capture(args: &[&str]) -> Result<String, String> {
 }
 
 pub(super) fn git_status(args: &[&str]) -> Result<(), String> {
+    process::ensure_command_exists("git", "dusk git tui")?;
     let output = Command::new("git")
         .args(args)
         .output()

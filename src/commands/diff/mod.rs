@@ -6,6 +6,8 @@ use crate::core::style::Style;
 use crate::core::theme;
 
 pub fn run(args: &[String]) -> Result<(), String> {
+    process::ensure_command_exists("git", "dusk diff")?;
+
     if args.iter().any(|a| a == "-h" || a == "--help") {
         let theme = theme::active(None);
         let style = Style::for_stdout();
