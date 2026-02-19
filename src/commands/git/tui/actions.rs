@@ -11,6 +11,7 @@ impl App {
             theme,
             style,
             pane: Pane::Files,
+            diff_mode: DiffMode::SelectedFile,
             tab: Tab::Workspace,
             input_mode: InputMode::None,
             input: String::new(),
@@ -29,6 +30,7 @@ impl App {
             diff_lines: Vec::new(),
             diff_rendered: Vec::new(),
             diff_render_width: 0,
+            diff_scroll: 0,
             commit_diff_lines: vec![
                 "Select a commit in Graph tab (j/k), then open CommitDiff tab".to_string(),
             ],
@@ -92,27 +94,53 @@ impl App {
         self.diff_lines.clear();
         self.diff_rendered.clear();
         self.diff_render_width = 0;
-        if self.files.is_empty() {
-            self.diff_lines.push("Working tree clean.".to_string());
-            return;
+        self.diff_scroll = 0;
+        match self.diff_mode {
+            DiffMode::SelectedFile => {
+                if self.files.is_empty() {
+                    self.diff_lines.push("Working tree clean.".to_string());
+                    return;
+                }
+
+                let selected = &self.files[self.selected].git_path;
+                let mut args = vec!["diff", "--no-color", "--", selected.as_str()];
+                let mut diff = git_capture(&args).unwrap_or_else(|e| format!("diff error: {e}"));
+
+                if diff.trim().is_empty() {
+                    args = vec!["diff", "--staged", "--no-color", "--", selected.as_str()];
+                    diff = git_capture(&args).unwrap_or_else(|e| format!("diff error: {e}"));
+                }
+
+                if diff.trim().is_empty() {
+                    self.diff_lines
+                        .push("No diff for selected file.".to_string());
+                    return;
+                }
+
+                self.diff_lines = diff.lines().map(ToString::to_string).collect();
+            }
+            DiffMode::Repo => {
+                let diff = git_capture(&["diff", "--no-color", "--unified=3"])
+                    .unwrap_or_else(|e| format!("diff error: {e}"));
+                if diff.trim().is_empty() {
+                    self.diff_lines.push("No repo diff.".to_string());
+                    return;
+                }
+                self.diff_lines = diff.lines().map(ToString::to_string).collect();
+            }
         }
+    }
 
-        let selected = &self.files[self.selected].git_path;
-        let mut args = vec!["diff", "--no-color", "--", selected.as_str()];
-        let mut diff = git_capture(&args).unwrap_or_else(|e| format!("diff error: {e}"));
-
-        if diff.trim().is_empty() {
-            args = vec!["diff", "--staged", "--no-color", "--", selected.as_str()];
-            diff = git_capture(&args).unwrap_or_else(|e| format!("diff error: {e}"));
-        }
-
-        if diff.trim().is_empty() {
-            self.diff_lines
-                .push("No diff for selected file.".to_string());
-            return;
-        }
-
-        self.diff_lines = diff.lines().map(ToString::to_string).collect();
+    pub(super) fn toggle_diff_mode(&mut self) {
+        self.diff_mode = match self.diff_mode {
+            DiffMode::SelectedFile => DiffMode::Repo,
+            DiffMode::Repo => DiffMode::SelectedFile,
+        };
+        self.refresh_diff();
+        self.status_msg = match self.diff_mode {
+            DiffMode::SelectedFile => "Diff mode: selected file".to_string(),
+            DiffMode::Repo => "Diff mode: full repo".to_string(),
+        };
     }
 
     pub(super) fn refresh_commit_diff(&mut self) {
@@ -167,7 +195,11 @@ impl App {
 
     pub(super) fn move_home_active(&mut self) {
         match self.tab {
-            Tab::Workspace => self.selected = 0,
+            Tab::Workspace => match self.pane {
+                Pane::Files => self.selected = 0,
+                Pane::Log => self.log_selected = 0,
+                Pane::Diff => self.diff_scroll = 0,
+            },
             Tab::Graph => self.log_selected = 0,
             Tab::CommitDiff => self.commit_diff_scroll = 0,
         }
@@ -175,7 +207,11 @@ impl App {
 
     pub(super) fn move_end_active(&mut self) {
         match self.tab {
-            Tab::Workspace => self.selected = self.files.len().saturating_sub(1),
+            Tab::Workspace => match self.pane {
+                Pane::Files => self.selected = self.files.len().saturating_sub(1),
+                Pane::Log => self.log_selected = self.log_lines.len().saturating_sub(1),
+                Pane::Diff => self.diff_scroll = self.diff_max_scroll_for_view(),
+            },
             Tab::Graph => self.log_selected = self.log_lines.len().saturating_sub(1),
             Tab::CommitDiff => self.commit_diff_scroll = self.commit_diff_max_scroll_for_view(),
         }
@@ -183,7 +219,11 @@ impl App {
 
     pub(super) fn move_up_active(&mut self) {
         match self.tab {
-            Tab::Workspace => self.move_up(),
+            Tab::Workspace => match self.pane {
+                Pane::Files => self.move_up(),
+                Pane::Log => self.log_selected = self.log_selected.saturating_sub(1),
+                Pane::Diff => self.diff_scroll = self.diff_scroll.saturating_sub(1),
+            },
             Tab::Graph => {
                 self.log_selected = self.log_selected.saturating_sub(1);
                 self.refresh_commit_diff();
@@ -196,7 +236,19 @@ impl App {
 
     pub(super) fn move_down_active(&mut self) {
         match self.tab {
-            Tab::Workspace => self.move_down(),
+            Tab::Workspace => match self.pane {
+                Pane::Files => self.move_down(),
+                Pane::Log => {
+                    self.log_selected = cmp::min(
+                        self.log_selected + 1,
+                        self.log_lines.len().saturating_sub(1),
+                    );
+                }
+                Pane::Diff => {
+                    self.diff_scroll =
+                        cmp::min(self.diff_scroll + 1, self.diff_max_scroll_for_view());
+                }
+            },
             Tab::Graph => {
                 self.log_selected = cmp::min(
                     self.log_selected + 1,
@@ -455,6 +507,17 @@ impl App {
                 self.tab = Tab::Workspace;
                 self.status_msg = "Focused diff pane".to_string();
             }
+            "repo-diff" | "repodiff" => {
+                self.diff_mode = DiffMode::Repo;
+                self.refresh_diff();
+                self.status_msg = "Diff mode: full repo".to_string();
+            }
+            "file-diff" | "filediff" => {
+                self.diff_mode = DiffMode::SelectedFile;
+                self.refresh_diff();
+                self.status_msg = "Diff mode: selected file".to_string();
+            }
+            "toggle-diff" | "togglediff" => self.toggle_diff_mode(),
             "status" => {
                 self.pane = Pane::Files;
                 self.tab = Tab::Workspace;
@@ -564,6 +627,14 @@ impl App {
             PaletteEntry {
                 label: "Open CommitDiff Tab".to_string(),
                 action: PaletteAction::Command("commitdiff"),
+            },
+            PaletteEntry {
+                label: "Diff Mode: Selected File".to_string(),
+                action: PaletteAction::Command("file-diff"),
+            },
+            PaletteEntry {
+                label: "Diff Mode: Repo".to_string(),
+                action: PaletteAction::Command("repo-diff"),
             },
             PaletteEntry {
                 label: "Show Help".to_string(),
@@ -691,35 +762,52 @@ impl App {
         rows
     }
 
-    pub(super) fn scroll_active_up(&mut self) -> bool {
-        if self.overlay == Some(Overlay::Palette) {
-            let before = self.palette_selected;
-            self.select_prev_palette();
-            return self.palette_selected != before;
+    pub(super) fn scroll_active_by(&mut self, delta: isize) -> bool {
+        if delta == 0 {
+            return false;
         }
-        match self.tab {
-            Tab::Workspace => false,
-            Tab::Graph => false,
-            Tab::CommitDiff => {
-                let before = self.commit_diff_scroll;
-                self.move_up_active();
-                self.commit_diff_scroll != before
-            }
-        }
-    }
 
-    pub(super) fn scroll_active_down(&mut self) -> bool {
         if self.overlay == Some(Overlay::Palette) {
             let before = self.palette_selected;
-            self.select_next_palette();
+            if delta > 0 {
+                for _ in 0..delta as usize {
+                    self.select_next_palette();
+                }
+            } else {
+                for _ in 0..(-delta) as usize {
+                    self.select_prev_palette();
+                }
+            }
             return self.palette_selected != before;
         }
+
         match self.tab {
-            Tab::Workspace => false,
+            Tab::Workspace => {
+                if self.pane != Pane::Diff {
+                    return false;
+                }
+                let before = self.diff_scroll;
+                if delta > 0 {
+                    let max = self.diff_max_scroll_for_view();
+                    self.diff_scroll = self.diff_scroll.saturating_add(delta as usize).min(max);
+                } else {
+                    self.diff_scroll = self.diff_scroll.saturating_sub((-delta) as usize);
+                }
+                self.diff_scroll != before
+            }
             Tab::Graph => false,
             Tab::CommitDiff => {
                 let before = self.commit_diff_scroll;
-                self.move_down_active();
+                if delta > 0 {
+                    let max = self.commit_diff_max_scroll_for_view();
+                    self.commit_diff_scroll = self
+                        .commit_diff_scroll
+                        .saturating_add(delta as usize)
+                        .min(max);
+                } else {
+                    self.commit_diff_scroll =
+                        self.commit_diff_scroll.saturating_sub((-delta) as usize);
+                }
                 self.commit_diff_scroll != before
             }
         }
@@ -737,7 +825,7 @@ pub(super) fn parse_commit_hash(line: &str) -> Option<String> {
 }
 
 pub(super) fn command_mode_help() -> String {
-    "Cmds: help|cmdhelp|refresh|stage|unstage|stage-all|unstage-all|commit <msg>|push|push-remote <remote>/<branch>|branch <name>|switch <name>|workspace|graph-tab|commitdiff|theme <name>|themes|palette|quit".to_string()
+    "Cmds: help|cmdhelp|refresh|stage|unstage|stage-all|unstage-all|commit <msg>|push|push-remote <remote>/<branch>|branch <name>|switch <name>|workspace|graph-tab|commitdiff|diff|file-diff|repo-diff|toggle-diff|theme <name>|themes|palette|quit".to_string()
 }
 
 fn parse_porcelain(s: &str) -> Vec<FileStatus> {

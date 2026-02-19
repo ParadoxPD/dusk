@@ -22,6 +22,12 @@ enum Pane {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
+enum DiffMode {
+    SelectedFile,
+    Repo,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum Tab {
     Workspace,
     Graph,
@@ -112,6 +118,7 @@ struct App {
     theme: Theme,
     style: Style,
     pane: Pane,
+    diff_mode: DiffMode,
     tab: Tab,
     input_mode: InputMode,
     input: String,
@@ -130,6 +137,7 @@ struct App {
     diff_lines: Vec<String>,
     diff_rendered: Vec<String>,
     diff_render_width: usize,
+    diff_scroll: usize,
     commit_diff_lines: Vec<String>,
     commit_diff_rendered: Vec<String>,
     commit_diff_render_width: usize,
@@ -196,10 +204,24 @@ pub fn run(theme_name: Option<&str>) -> Result<(), String> {
             Event::Resize(_, _) => dirty = true,
             Event::Mouse(mouse) => match mouse.kind {
                 MouseEventKind::ScrollUp => {
-                    dirty = app.scroll_active_up();
+                    let mut delta: isize = -1;
+                    if drain_scroll_delta(&mut app, &mut delta, &mut dirty, &mut last_cursor_phase)?
+                    {
+                        break;
+                    }
+                    if app.scroll_active_by(delta) {
+                        dirty = true;
+                    }
                 }
                 MouseEventKind::ScrollDown => {
-                    dirty = app.scroll_active_down();
+                    let mut delta: isize = 1;
+                    if drain_scroll_delta(&mut app, &mut delta, &mut dirty, &mut last_cursor_phase)?
+                    {
+                        break;
+                    }
+                    if app.scroll_active_by(delta) {
+                        dirty = true;
+                    }
                 }
                 _ => {}
             },
@@ -216,4 +238,32 @@ fn blink_phase() -> bool {
         .map(|d| d.as_millis())
         .unwrap_or(0);
     (ms / 500) % 2 == 0
+}
+
+fn drain_scroll_delta(
+    app: &mut App,
+    delta: &mut isize,
+    dirty: &mut bool,
+    last_cursor_phase: &mut bool,
+) -> Result<bool, String> {
+    while event::poll(Duration::from_millis(0)).map_err(|e| e.to_string())? {
+        match event::read().map_err(|e| e.to_string())? {
+            Event::Mouse(m2) => match m2.kind {
+                MouseEventKind::ScrollUp => *delta -= 1,
+                MouseEventKind::ScrollDown => *delta += 1,
+                _ => {}
+            },
+            Event::Key(k2) => match app.handle_key(k2)? {
+                KeyAction::Quit => return Ok(true),
+                KeyAction::Redraw => {
+                    *last_cursor_phase = blink_phase();
+                    *dirty = true;
+                }
+                KeyAction::None => {}
+            },
+            Event::Resize(_, _) => *dirty = true,
+            _ => {}
+        }
+    }
+    Ok(false)
 }

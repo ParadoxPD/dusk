@@ -10,6 +10,22 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 use super::*;
 
 impl App {
+    pub(super) fn diff_max_scroll_for_view(&mut self) -> usize {
+        let (w, h) = crossterm::terminal::size().unwrap_or((140, 40));
+        let width = w as usize;
+        let rows = (h as usize).saturating_sub(6);
+        if self.diff_render_width != width || self.diff_rendered.is_empty() {
+            self.diff_rendered = super::super::diffview::render_side_by_side(
+                &self.diff_lines.join("\n"),
+                &self.style,
+                self.theme,
+                width,
+            );
+            self.diff_render_width = width;
+        }
+        self.diff_rendered.len().saturating_sub(rows)
+    }
+
     pub(super) fn commit_diff_max_scroll_for_view(&mut self) -> usize {
         let (w, h) = crossterm::terminal::size().unwrap_or((140, 40));
         let width = w as usize;
@@ -255,10 +271,14 @@ impl App {
 
     fn render_diff(&mut self, width: usize, height: usize) -> Vec<String> {
         let mut lines = Vec::with_capacity(height);
+        let mode = match self.diff_mode {
+            DiffMode::SelectedFile => "selected-file",
+            DiffMode::Repo => "repo",
+        };
         lines.push(if self.pane == Pane::Diff {
-            self.color_cell(" DIFF ", width, self.theme.ok)
+            self.color_cell(&format!(" DIFF [{mode}] "), width, self.theme.ok)
         } else {
-            self.color_cell(" DIFF ", width, self.theme.accent)
+            self.color_cell(&format!(" DIFF [{mode}] "), width, self.theme.accent)
         });
 
         if self.diff_render_width != width || self.diff_rendered.is_empty() {
@@ -270,9 +290,15 @@ impl App {
             );
             self.diff_render_width = width;
         }
+        let rows = height.saturating_sub(1);
+        let max_scroll = self.diff_rendered.len().saturating_sub(rows);
+        if self.diff_scroll > max_scroll {
+            self.diff_scroll = max_scroll;
+        }
         for line in self
             .diff_rendered
             .iter()
+            .skip(self.diff_scroll)
             .take(height.saturating_sub(1))
             .cloned()
         {
@@ -404,7 +430,7 @@ impl App {
                 self.theme.info,
             ),
             (
-                "b create branch, B switch branch".to_string(),
+                "b create branch, B switch branch, D toggle repo/file diff".to_string(),
                 self.theme.info,
             ),
             ("".to_string(), self.theme.info),
@@ -414,7 +440,7 @@ impl App {
                 self.theme.info,
             ),
             (
-                ":workspace :graph-tab :commitdiff :theme <name> :themes".to_string(),
+                ":workspace :graph-tab :commitdiff :file-diff :repo-diff".to_string(),
                 self.theme.info,
             ),
             (

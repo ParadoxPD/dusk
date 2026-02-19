@@ -57,6 +57,10 @@ impl App {
                 self.cycle_theme();
                 changed = true;
             }
+            KeyCode::Char('D') => {
+                self.toggle_diff_mode();
+                changed = true;
+            }
             KeyCode::Char('h') | KeyCode::Left if self.tab == Tab::Workspace => {
                 let before = self.pane;
                 self.pane = prev_pane(self.pane);
@@ -68,24 +72,64 @@ impl App {
                 changed = self.pane != before;
             }
             KeyCode::Char('j') | KeyCode::Down => {
-                let before = (self.selected, self.log_selected, self.commit_diff_scroll);
+                let before = (
+                    self.selected,
+                    self.log_selected,
+                    self.diff_scroll,
+                    self.commit_diff_scroll,
+                );
                 self.move_down_active();
-                changed = (self.selected, self.log_selected, self.commit_diff_scroll) != before;
+                changed = (
+                    self.selected,
+                    self.log_selected,
+                    self.diff_scroll,
+                    self.commit_diff_scroll,
+                ) != before;
             }
             KeyCode::Char('k') | KeyCode::Up => {
-                let before = (self.selected, self.log_selected, self.commit_diff_scroll);
+                let before = (
+                    self.selected,
+                    self.log_selected,
+                    self.diff_scroll,
+                    self.commit_diff_scroll,
+                );
                 self.move_up_active();
-                changed = (self.selected, self.log_selected, self.commit_diff_scroll) != before;
+                changed = (
+                    self.selected,
+                    self.log_selected,
+                    self.diff_scroll,
+                    self.commit_diff_scroll,
+                ) != before;
             }
             KeyCode::Char('g') => {
-                let before = (self.selected, self.log_selected, self.commit_diff_scroll);
+                let before = (
+                    self.selected,
+                    self.log_selected,
+                    self.diff_scroll,
+                    self.commit_diff_scroll,
+                );
                 self.move_home_active();
-                changed = (self.selected, self.log_selected, self.commit_diff_scroll) != before;
+                changed = (
+                    self.selected,
+                    self.log_selected,
+                    self.diff_scroll,
+                    self.commit_diff_scroll,
+                ) != before;
             }
             KeyCode::Char('G') => {
-                let before = (self.selected, self.log_selected, self.commit_diff_scroll);
+                let before = (
+                    self.selected,
+                    self.log_selected,
+                    self.diff_scroll,
+                    self.commit_diff_scroll,
+                );
                 self.move_end_active();
-                changed = (self.selected, self.log_selected, self.commit_diff_scroll) != before;
+                changed = (
+                    self.selected,
+                    self.log_selected,
+                    self.diff_scroll,
+                    self.commit_diff_scroll,
+                ) != before;
             }
             KeyCode::Char('s') => {
                 self.stage_selected()?;
