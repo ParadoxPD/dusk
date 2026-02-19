@@ -10,10 +10,7 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 use super::*;
 
 impl App {
-    pub(super) fn diff_max_scroll_for_view(&mut self) -> usize {
-        let (w, h) = crossterm::terminal::size().unwrap_or((140, 40));
-        let width = w as usize;
-        let rows = (h as usize).saturating_sub(6);
+    fn ensure_diff_rendered(&mut self, width: usize) {
         if self.diff_render_width != width || self.diff_rendered.is_empty() {
             self.diff_rendered = super::super::diffview::render_side_by_side(
                 &self.diff_lines.join("\n"),
@@ -23,13 +20,32 @@ impl App {
             );
             self.diff_render_width = width;
         }
-        self.diff_rendered.len().saturating_sub(rows)
     }
 
-    pub(super) fn commit_diff_max_scroll_for_view(&mut self) -> usize {
-        let (w, h) = crossterm::terminal::size().unwrap_or((140, 40));
-        let width = w as usize;
-        let rows = (h as usize).saturating_sub(6);
+    fn diff_header(&self, width: usize) -> String {
+        let mode = match self.diff_mode {
+            DiffMode::SelectedFile => "selected-file",
+            DiffMode::Repo => "repo",
+        };
+        if self.pane == Pane::Diff {
+            self.color_cell(&format!(" DIFF [{mode}] "), width, self.theme.ok)
+        } else {
+            self.color_cell(&format!(" DIFF [{mode}] "), width, self.theme.accent)
+        }
+    }
+
+    fn diff_window(&mut self, width: usize, height: usize) -> (usize, usize) {
+        self.ensure_diff_rendered(width);
+        let rows = height.saturating_sub(1);
+        self.diff_view_rows = rows;
+        let max_scroll = self.diff_rendered.len().saturating_sub(rows);
+        if self.diff_scroll > max_scroll {
+            self.diff_scroll = max_scroll;
+        }
+        (self.diff_scroll, rows)
+    }
+
+    fn ensure_commit_diff_rendered(&mut self, width: usize) {
         if self.commit_diff_render_width != width || self.commit_diff_rendered.is_empty() {
             self.commit_diff_rendered = super::super::diffview::render_side_by_side(
                 &self.commit_diff_lines.join("\n"),
@@ -39,7 +55,26 @@ impl App {
             );
             self.commit_diff_render_width = width;
         }
-        self.commit_diff_rendered.len().saturating_sub(rows)
+    }
+
+    fn commit_diff_header(&self, width: usize) -> String {
+        let sha = self
+            .selected_commit
+            .as_deref()
+            .map(|s| s.chars().take(12).collect::<String>())
+            .unwrap_or_else(|| "none".to_string());
+        self.color_cell(&format!(" COMMIT DIFF ({sha}) "), width, self.theme.ok)
+    }
+
+    fn commit_diff_window(&mut self, width: usize, height: usize) -> (usize, usize) {
+        self.ensure_commit_diff_rendered(width);
+        let rows = height.saturating_sub(1);
+        self.commit_diff_view_rows = rows;
+        let max_scroll = self.commit_diff_rendered.len().saturating_sub(rows);
+        if self.commit_diff_scroll > max_scroll {
+            self.commit_diff_scroll = max_scroll;
+        }
+        (self.commit_diff_scroll, rows)
     }
 
     pub(super) fn render(&mut self, cursor_on: bool) -> Result<(), String> {
@@ -84,7 +119,9 @@ impl App {
 
                     let files = self.render_files(w, status_h);
                     let logs = self.render_log(w, log_h);
-                    let diff = self.render_diff(w, diff_h);
+                    let diff_header = self.diff_header(w);
+                    let (diff_start, diff_rows) = self.diff_window(w, diff_h);
+                    let diff_blank = " ".repeat(w);
 
                     let mut row = 3usize;
                     for line in files {
@@ -95,32 +132,55 @@ impl App {
                         draw_line(&mut out, row as u16, &line)?;
                         row += 1;
                     }
-                    for line in diff {
-                        draw_line(&mut out, row as u16, &line)?;
+
+                    draw_line(&mut out, row as u16, &diff_header)?;
+                    row += 1;
+                    for i in 0..diff_rows {
+                        let line = self
+                            .diff_rendered
+                            .get(diff_start + i)
+                            .map(String::as_str)
+                            .unwrap_or(diff_blank.as_str());
+                        draw_line(&mut out, row as u16, line)?;
                         row += 1;
                     }
                 } else {
                     let left_w = cmp::min(cmp::max(36, w * 2 / 5), w.saturating_sub(24));
                     let right_w = w.saturating_sub(left_w + 1);
                     let log_h = body_h / 2;
+                    let diff_h = body_h.saturating_sub(log_h);
 
                     let files = self.render_files(left_w, body_h);
                     let logs = self.render_log(right_w, log_h);
-                    let diff = self.render_diff(right_w, body_h.saturating_sub(log_h));
+                    let diff_header = self.diff_header(right_w);
+                    let (diff_start, diff_rows) = self.diff_window(right_w, diff_h);
+                    let left_blank = " ".repeat(left_w);
+                    let right_blank = " ".repeat(right_w);
 
                     for row in 0..body_h {
                         let left = files
                             .get(row)
-                            .cloned()
-                            .unwrap_or_else(|| " ".repeat(left_w));
+                            .map(String::as_str)
+                            .unwrap_or(left_blank.as_str());
                         let right = if row < log_h {
                             logs.get(row)
-                                .cloned()
-                                .unwrap_or_else(|| " ".repeat(right_w))
+                                .map(String::as_str)
+                                .unwrap_or(right_blank.as_str())
                         } else {
-                            diff.get(row - log_h)
-                                .cloned()
-                                .unwrap_or_else(|| " ".repeat(right_w))
+                            let drow = row - log_h;
+                            if drow == 0 {
+                                diff_header.as_str()
+                            } else {
+                                let idx = drow - 1;
+                                if idx < diff_rows {
+                                    self.diff_rendered
+                                        .get(diff_start + idx)
+                                        .map(String::as_str)
+                                        .unwrap_or(right_blank.as_str())
+                                } else {
+                                    right_blank.as_str()
+                                }
+                            }
                         };
                         let sep = self.style.paint(self.theme.accent, "│");
                         draw_line(&mut out, (row + 3) as u16, &format!("{left}{sep}{right}"))?;
@@ -134,9 +194,31 @@ impl App {
                 }
             }
             Tab::CommitDiff => {
-                let diff = self.render_commit_diff_tab(w, body_h);
-                for (row, line) in diff.into_iter().enumerate() {
-                    draw_line(&mut out, (row + 3) as u16, &line)?;
+                let header = self.commit_diff_header(w);
+                draw_line(&mut out, 3, &header)?;
+                if self.commit_diff_lines.is_empty() {
+                    draw_line(
+                        &mut out,
+                        4,
+                        &self.color_cell("No commit diff loaded", w, self.theme.warn),
+                    )?;
+                    for row in 5..(body_h + 3) {
+                        draw_line(&mut out, row as u16, &" ".repeat(w))?;
+                    }
+                } else {
+                    let (start, rows) = self.commit_diff_window(w, body_h);
+                    let blank = " ".repeat(w);
+                    for i in 0..rows {
+                        let line = self
+                            .commit_diff_rendered
+                            .get(start + i)
+                            .map(String::as_str)
+                            .unwrap_or(blank.as_str());
+                        draw_line(&mut out, (4 + i) as u16, line)?;
+                    }
+                    for row in (4 + rows)..(body_h + 3) {
+                        draw_line(&mut out, row as u16, blank.as_str())?;
+                    }
                 }
             }
         }
@@ -269,47 +351,6 @@ impl App {
         lines
     }
 
-    fn render_diff(&mut self, width: usize, height: usize) -> Vec<String> {
-        let mut lines = Vec::with_capacity(height);
-        let mode = match self.diff_mode {
-            DiffMode::SelectedFile => "selected-file",
-            DiffMode::Repo => "repo",
-        };
-        lines.push(if self.pane == Pane::Diff {
-            self.color_cell(&format!(" DIFF [{mode}] "), width, self.theme.ok)
-        } else {
-            self.color_cell(&format!(" DIFF [{mode}] "), width, self.theme.accent)
-        });
-
-        if self.diff_render_width != width || self.diff_rendered.is_empty() {
-            self.diff_rendered = super::super::diffview::render_side_by_side(
-                &self.diff_lines.join("\n"),
-                &self.style,
-                self.theme,
-                width,
-            );
-            self.diff_render_width = width;
-        }
-        let rows = height.saturating_sub(1);
-        let max_scroll = self.diff_rendered.len().saturating_sub(rows);
-        if self.diff_scroll > max_scroll {
-            self.diff_scroll = max_scroll;
-        }
-        for line in self
-            .diff_rendered
-            .iter()
-            .skip(self.diff_scroll)
-            .take(height.saturating_sub(1))
-            .cloned()
-        {
-            lines.push(line);
-        }
-        while lines.len() < height {
-            lines.push(" ".repeat(width));
-        }
-        lines
-    }
-
     fn render_graph_tab(&self, width: usize, height: usize) -> Vec<String> {
         let mut lines = Vec::with_capacity(height);
         lines.push(self.color_cell(" FULL GIT GRAPH ", width, self.theme.ok));
@@ -330,50 +371,6 @@ impl App {
             } else {
                 lines.push(color_log_line(self, line, width));
             }
-        }
-        while lines.len() < height {
-            lines.push(" ".repeat(width));
-        }
-        lines
-    }
-
-    fn render_commit_diff_tab(&mut self, width: usize, height: usize) -> Vec<String> {
-        let mut lines = Vec::with_capacity(height);
-        let sha = self
-            .selected_commit
-            .as_deref()
-            .map(|s| s.chars().take(12).collect::<String>())
-            .unwrap_or_else(|| "none".to_string());
-        lines.push(self.color_cell(&format!(" COMMIT DIFF ({sha}) "), width, self.theme.ok));
-        if self.commit_diff_lines.is_empty() {
-            lines.push(self.color_cell("No commit diff loaded", width, self.theme.warn));
-            while lines.len() < height {
-                lines.push(" ".repeat(width));
-            }
-            return lines;
-        }
-
-        let rows = height.saturating_sub(1);
-        if self.commit_diff_render_width != width || self.commit_diff_rendered.is_empty() {
-            self.commit_diff_rendered = super::super::diffview::render_side_by_side(
-                &self.commit_diff_lines.join("\n"),
-                &self.style,
-                self.theme,
-                width,
-            );
-            self.commit_diff_render_width = width;
-        }
-        let max_scroll = self.commit_diff_rendered.len().saturating_sub(rows);
-        if self.commit_diff_scroll > max_scroll {
-            self.commit_diff_scroll = max_scroll;
-        }
-        for line in self
-            .commit_diff_rendered
-            .iter()
-            .skip(self.commit_diff_scroll)
-            .take(rows)
-        {
-            lines.push(line.clone());
         }
         while lines.len() < height {
             lines.push(" ".repeat(width));

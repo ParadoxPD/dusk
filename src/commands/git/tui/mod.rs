@@ -138,10 +138,12 @@ struct App {
     diff_rendered: Vec<String>,
     diff_render_width: usize,
     diff_scroll: usize,
+    diff_view_rows: usize,
     commit_diff_lines: Vec<String>,
     commit_diff_rendered: Vec<String>,
     commit_diff_render_width: usize,
     commit_diff_scroll: usize,
+    commit_diff_view_rows: usize,
     push_overlay_lines: Vec<String>,
     push_overlay_ok: Option<bool>,
 }
@@ -193,14 +195,36 @@ pub fn run(theme_name: Option<&str>) -> Result<(), String> {
         }
 
         match event::read().map_err(|e| e.to_string())? {
-            Event::Key(key) => match app.handle_key(key)? {
-                KeyAction::Quit => break,
-                KeyAction::Redraw => {
-                    last_cursor_phase = blink_phase();
-                    dirty = true;
+            Event::Key(key) => {
+                if app.overlay.is_none()
+                    && app.input_mode == InputMode::None
+                    && is_diff_scroll_context(&app)
+                    && is_scroll_key(&key)
+                {
+                    let mut delta = if is_scroll_down_key(&key) { 1 } else { -1 };
+                    if drain_key_scroll_delta(
+                        &mut app,
+                        &mut delta,
+                        &mut dirty,
+                        &mut last_cursor_phase,
+                    )? {
+                        break;
+                    }
+                    if app.scroll_active_by(delta) {
+                        dirty = true;
+                    }
+                    continue;
                 }
-                KeyAction::None => {}
-            },
+
+                match app.handle_key(key)? {
+                    KeyAction::Quit => break,
+                    KeyAction::Redraw => {
+                        last_cursor_phase = blink_phase();
+                        dirty = true;
+                    }
+                    KeyAction::None => {}
+                }
+            }
             Event::Resize(_, _) => dirty = true,
             Event::Mouse(mouse) => match mouse.kind {
                 MouseEventKind::ScrollUp => {
@@ -240,6 +264,28 @@ fn blink_phase() -> bool {
     (ms / 500) % 2 == 0
 }
 
+fn is_diff_scroll_context(app: &App) -> bool {
+    (app.tab == Tab::Workspace && app.pane == Pane::Diff) || app.tab == Tab::CommitDiff
+}
+
+fn is_scroll_down_key(key: &crossterm::event::KeyEvent) -> bool {
+    matches!(
+        key.code,
+        crossterm::event::KeyCode::Down | crossterm::event::KeyCode::Char('j')
+    ) && key.modifiers.is_empty()
+}
+
+fn is_scroll_up_key(key: &crossterm::event::KeyEvent) -> bool {
+    matches!(
+        key.code,
+        crossterm::event::KeyCode::Up | crossterm::event::KeyCode::Char('k')
+    ) && key.modifiers.is_empty()
+}
+
+fn is_scroll_key(key: &crossterm::event::KeyEvent) -> bool {
+    is_scroll_down_key(key) || is_scroll_up_key(key)
+}
+
 fn drain_scroll_delta(
     app: &mut App,
     delta: &mut isize,
@@ -265,5 +311,47 @@ fn drain_scroll_delta(
             _ => {}
         }
     }
+    Ok(false)
+}
+
+fn drain_key_scroll_delta(
+    app: &mut App,
+    delta: &mut isize,
+    dirty: &mut bool,
+    last_cursor_phase: &mut bool,
+) -> Result<bool, String> {
+    while event::poll(Duration::from_millis(0)).map_err(|e| e.to_string())? {
+        match event::read().map_err(|e| e.to_string())? {
+            Event::Key(k2) => {
+                if is_scroll_down_key(&k2) {
+                    *delta += 1;
+                    continue;
+                }
+                if is_scroll_up_key(&k2) {
+                    *delta -= 1;
+                    continue;
+                }
+                match app.handle_key(k2)? {
+                    KeyAction::Quit => return Ok(true),
+                    KeyAction::Redraw => {
+                        *last_cursor_phase = blink_phase();
+                        *dirty = true;
+                    }
+                    KeyAction::None => {}
+                }
+            }
+            Event::Mouse(m2) => match m2.kind {
+                MouseEventKind::ScrollUp => *delta -= 1,
+                MouseEventKind::ScrollDown => *delta += 1,
+                _ => {}
+            },
+            Event::Resize(_, _) => *dirty = true,
+            _ => {}
+        }
+    }
+    // Keep keyboard hold movement smooth and constant speed:
+    // collapse bursty repeat queues into a fixed step direction.
+    let dir = delta.signum();
+    *delta = if dir == 0 { 0 } else { dir * 2 };
     Ok(false)
 }

@@ -31,12 +31,14 @@ impl App {
             diff_rendered: Vec::new(),
             diff_render_width: 0,
             diff_scroll: 0,
+            diff_view_rows: 0,
             commit_diff_lines: vec![
                 "Select a commit in Graph tab (j/k), then open CommitDiff tab".to_string(),
             ],
             commit_diff_rendered: Vec::new(),
             commit_diff_render_width: 0,
             commit_diff_scroll: 0,
+            commit_diff_view_rows: 0,
             push_overlay_lines: Vec::new(),
             push_overlay_ok: None,
         }
@@ -95,6 +97,7 @@ impl App {
         self.diff_rendered.clear();
         self.diff_render_width = 0;
         self.diff_scroll = 0;
+        self.diff_view_rows = 0;
         match self.diff_mode {
             DiffMode::SelectedFile => {
                 if self.files.is_empty() {
@@ -146,6 +149,7 @@ impl App {
     pub(super) fn refresh_commit_diff(&mut self) {
         self.commit_diff_rendered.clear();
         self.commit_diff_render_width = 0;
+        self.commit_diff_view_rows = 0;
         self.selected_commit = None;
         if self.log_lines.is_empty() {
             self.commit_diff_lines = vec!["No commits found.".to_string()];
@@ -210,10 +214,10 @@ impl App {
             Tab::Workspace => match self.pane {
                 Pane::Files => self.selected = self.files.len().saturating_sub(1),
                 Pane::Log => self.log_selected = self.log_lines.len().saturating_sub(1),
-                Pane::Diff => self.diff_scroll = self.diff_max_scroll_for_view(),
+                Pane::Diff => self.diff_scroll = self.diff_max_scroll_cached(),
             },
             Tab::Graph => self.log_selected = self.log_lines.len().saturating_sub(1),
-            Tab::CommitDiff => self.commit_diff_scroll = self.commit_diff_max_scroll_for_view(),
+            Tab::CommitDiff => self.commit_diff_scroll = self.commit_diff_max_scroll_cached(),
         }
     }
 
@@ -246,7 +250,7 @@ impl App {
                 }
                 Pane::Diff => {
                     self.diff_scroll =
-                        cmp::min(self.diff_scroll + 1, self.diff_max_scroll_for_view());
+                        cmp::min(self.diff_scroll + 1, self.diff_max_scroll_cached());
                 }
             },
             Tab::Graph => {
@@ -259,7 +263,7 @@ impl App {
             Tab::CommitDiff => {
                 self.commit_diff_scroll = cmp::min(
                     self.commit_diff_scroll + 1,
-                    self.commit_diff_max_scroll_for_view(),
+                    self.commit_diff_max_scroll_cached(),
                 );
             }
         }
@@ -788,7 +792,7 @@ impl App {
                 }
                 let before = self.diff_scroll;
                 if delta > 0 {
-                    let max = self.diff_max_scroll_for_view();
+                    let max = self.diff_max_scroll_cached();
                     self.diff_scroll = self.diff_scroll.saturating_add(delta as usize).min(max);
                 } else {
                     self.diff_scroll = self.diff_scroll.saturating_sub((-delta) as usize);
@@ -799,7 +803,7 @@ impl App {
             Tab::CommitDiff => {
                 let before = self.commit_diff_scroll;
                 if delta > 0 {
-                    let max = self.commit_diff_max_scroll_for_view();
+                    let max = self.commit_diff_max_scroll_cached();
                     self.commit_diff_scroll = self
                         .commit_diff_scroll
                         .saturating_add(delta as usize)
@@ -811,6 +815,16 @@ impl App {
                 self.commit_diff_scroll != before
             }
         }
+    }
+
+    fn diff_max_scroll_cached(&self) -> usize {
+        let rows = self.diff_view_rows.max(1);
+        self.diff_rendered.len().saturating_sub(rows)
+    }
+
+    fn commit_diff_max_scroll_cached(&self) -> usize {
+        let rows = self.commit_diff_view_rows.max(1);
+        self.commit_diff_rendered.len().saturating_sub(rows)
     }
 }
 
