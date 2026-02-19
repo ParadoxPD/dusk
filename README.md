@@ -38,9 +38,8 @@ dusk cat [OPTIONS] [FILE]...
 dusk bat [OPTIONS] [FILE]...
 
 dusk git log [theme]
-dusk git graph [theme]
 dusk git status [theme]
-dusk git viz [theme]
+dusk git diff [theme] [--staged] [--tui]
 dusk git tui [theme]
 
 dusk diff [theme] [--staged]

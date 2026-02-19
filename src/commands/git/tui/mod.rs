@@ -45,6 +45,12 @@ enum Overlay {
     Push,
 }
 
+enum KeyAction {
+    None,
+    Redraw,
+    Quit,
+}
+
 #[derive(Clone)]
 enum PaletteAction {
     Command(&'static str),
@@ -120,8 +126,13 @@ struct App {
     log_lines: Vec<String>,
     log_commits: Vec<Option<String>>,
     log_selected: usize,
+    selected_commit: Option<String>,
     diff_lines: Vec<String>,
+    diff_rendered: Vec<String>,
+    diff_render_width: usize,
     commit_diff_lines: Vec<String>,
+    commit_diff_rendered: Vec<String>,
+    commit_diff_render_width: usize,
     commit_diff_scroll: usize,
     push_overlay_lines: Vec<String>,
     push_overlay_ok: Option<bool>,
@@ -174,22 +185,24 @@ pub fn run(theme_name: Option<&str>) -> Result<(), String> {
         }
 
         match event::read().map_err(|e| e.to_string())? {
-            Event::Key(key) => {
-                if app.handle_key(key)? {
-                    break;
+            Event::Key(key) => match app.handle_key(key)? {
+                KeyAction::Quit => break,
+                KeyAction::Redraw => {
+                    last_cursor_phase = blink_phase();
+                    dirty = true;
                 }
-                last_cursor_phase = blink_phase();
-                dirty = true;
-            }
+                KeyAction::None => {}
+            },
             Event::Resize(_, _) => dirty = true,
-            Event::Mouse(mouse) => {
-                match mouse.kind {
-                    MouseEventKind::ScrollUp => app.scroll_active_up(),
-                    MouseEventKind::ScrollDown => app.scroll_active_down(),
-                    _ => {}
+            Event::Mouse(mouse) => match mouse.kind {
+                MouseEventKind::ScrollUp => {
+                    dirty = app.scroll_active_up();
                 }
-                dirty = true;
-            }
+                MouseEventKind::ScrollDown => {
+                    dirty = app.scroll_active_down();
+                }
+                _ => {}
+            },
             _ => {}
         }
     }

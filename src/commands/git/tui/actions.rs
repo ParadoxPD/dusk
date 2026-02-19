@@ -25,10 +25,15 @@ impl App {
             log_lines: Vec::new(),
             log_commits: Vec::new(),
             log_selected: 0,
+            selected_commit: None,
             diff_lines: Vec::new(),
+            diff_rendered: Vec::new(),
+            diff_render_width: 0,
             commit_diff_lines: vec![
                 "Select a commit in Graph tab (j/k), then open CommitDiff tab".to_string(),
             ],
+            commit_diff_rendered: Vec::new(),
+            commit_diff_render_width: 0,
             commit_diff_scroll: 0,
             push_overlay_lines: Vec::new(),
             push_overlay_ok: None,
@@ -85,6 +90,8 @@ impl App {
 
     pub(super) fn refresh_diff(&mut self) {
         self.diff_lines.clear();
+        self.diff_rendered.clear();
+        self.diff_render_width = 0;
         if self.files.is_empty() {
             self.diff_lines.push("Working tree clean.".to_string());
             return;
@@ -109,6 +116,9 @@ impl App {
     }
 
     pub(super) fn refresh_commit_diff(&mut self) {
+        self.commit_diff_rendered.clear();
+        self.commit_diff_render_width = 0;
+        self.selected_commit = None;
         if self.log_lines.is_empty() {
             self.commit_diff_lines = vec!["No commits found.".to_string()];
             self.commit_diff_scroll = 0;
@@ -140,6 +150,7 @@ impl App {
             self.commit_diff_scroll = 0;
             return;
         };
+        self.selected_commit = Some(hash.clone());
 
         let output = git_capture(&["show", "--stat", "--patch", "--color=never", &hash])
             .unwrap_or_else(|e| format!("commit diff error: {e}"));
@@ -166,9 +177,7 @@ impl App {
         match self.tab {
             Tab::Workspace => self.selected = self.files.len().saturating_sub(1),
             Tab::Graph => self.log_selected = self.log_lines.len().saturating_sub(1),
-            Tab::CommitDiff => {
-                self.commit_diff_scroll = self.commit_diff_lines.len().saturating_sub(1)
-            }
+            Tab::CommitDiff => self.commit_diff_scroll = self.commit_diff_max_scroll_for_view(),
         }
     }
 
@@ -198,7 +207,7 @@ impl App {
             Tab::CommitDiff => {
                 self.commit_diff_scroll = cmp::min(
                     self.commit_diff_scroll + 1,
-                    self.commit_diff_lines.len().saturating_sub(1),
+                    self.commit_diff_max_scroll_for_view(),
                 );
             }
         }
@@ -208,14 +217,22 @@ impl App {
         if self.files.is_empty() {
             return;
         }
+        let before = self.selected;
         self.selected = self.selected.saturating_sub(1);
+        if self.selected != before {
+            self.refresh_diff();
+        }
     }
 
     pub(super) fn move_down(&mut self) {
         if self.files.is_empty() {
             return;
         }
+        let before = self.selected;
         self.selected = cmp::min(self.selected + 1, self.files.len().saturating_sub(1));
+        if self.selected != before {
+            self.refresh_diff();
+        }
     }
 
     pub(super) fn stage_selected(&mut self) -> Result<(), String> {
@@ -674,20 +691,38 @@ impl App {
         rows
     }
 
-    pub(super) fn scroll_active_up(&mut self) {
+    pub(super) fn scroll_active_up(&mut self) -> bool {
         if self.overlay == Some(Overlay::Palette) {
+            let before = self.palette_selected;
             self.select_prev_palette();
-            return;
+            return self.palette_selected != before;
         }
-        self.move_up_active();
+        match self.tab {
+            Tab::Workspace => false,
+            Tab::Graph => false,
+            Tab::CommitDiff => {
+                let before = self.commit_diff_scroll;
+                self.move_up_active();
+                self.commit_diff_scroll != before
+            }
+        }
     }
 
-    pub(super) fn scroll_active_down(&mut self) {
+    pub(super) fn scroll_active_down(&mut self) -> bool {
         if self.overlay == Some(Overlay::Palette) {
+            let before = self.palette_selected;
             self.select_next_palette();
-            return;
+            return self.palette_selected != before;
         }
-        self.move_down_active();
+        match self.tab {
+            Tab::Workspace => false,
+            Tab::Graph => false,
+            Tab::CommitDiff => {
+                let before = self.commit_diff_scroll;
+                self.move_down_active();
+                self.commit_diff_scroll != before
+            }
+        }
     }
 }
 

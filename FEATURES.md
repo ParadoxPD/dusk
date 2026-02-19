@@ -11,8 +11,9 @@ This document outlines all `dusk` subcommands, flags, and compatibility notes.
 - `dusk eza [OPTIONS] [FILE|DIR]...` (alias of `ls`)
 - `dusk cat [OPTIONS] [FILE]...`
 - `dusk bat [OPTIONS] [FILE]...`
-- `dusk git log|graph [theme]`
-- `dusk git status|viz [theme]`
+- `dusk git log [theme]`
+- `dusk git status [theme]`
+- `dusk git diff [theme] [--staged] [--tui]`
 - `dusk git tui|interactive [theme]`
 - `dusk diff [theme] [--staged]`
 - `dusk dump [--hex|--asm|--both] [--theme <name>] <file>...`
@@ -64,8 +65,9 @@ This document outlines all `dusk` subcommands, flags, and compatibility notes.
 
 ### Non-interactive
 
-- `dusk git log` / `graph`: commit graph visualization.
-- `dusk git status` / `viz`: grouped staged/modified/untracked status panel.
+- `dusk git log`: commit graph visualization.
+- `dusk git status`: grouped staged/modified/untracked status panel.
+- `dusk git diff`: side-by-side line-numbered diff with syntax highlighting.
 
 ### Interactive TUI
 

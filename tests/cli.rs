@@ -265,6 +265,31 @@ fn diff_help_and_git_help_are_available() {
 }
 
 #[test]
+fn git_diff_help_is_available() {
+    dusk()
+        .args(["git", "diff", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("dusk git diff"))
+        .stdout(predicate::str::contains("--tui"));
+}
+
+#[test]
+fn git_redundant_aliases_show_migration_errors() {
+    dusk()
+        .args(["git", "graph"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Use `dusk git log`"));
+
+    dusk()
+        .args(["git", "viz"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Use `dusk git status`"));
+}
+
+#[test]
 fn unknown_command_fails() {
     dusk()
         .arg("unknown-subcommand")

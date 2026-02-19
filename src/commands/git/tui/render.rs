@@ -4,25 +4,35 @@ use std::io::{self, Write};
 use crossterm::cursor::MoveTo;
 use crossterm::queue;
 use crossterm::style::Print;
-use crossterm::terminal::{BeginSynchronizedUpdate, Clear, ClearType, EndSynchronizedUpdate};
+use crossterm::terminal::{BeginSynchronizedUpdate, EndSynchronizedUpdate};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use super::*;
 
 impl App {
-    pub(super) fn render(&self, cursor_on: bool) -> Result<(), String> {
+    pub(super) fn commit_diff_max_scroll_for_view(&mut self) -> usize {
+        let (w, h) = crossterm::terminal::size().unwrap_or((140, 40));
+        let width = w as usize;
+        let rows = (h as usize).saturating_sub(6);
+        if self.commit_diff_render_width != width || self.commit_diff_rendered.is_empty() {
+            self.commit_diff_rendered = super::super::diffview::render_side_by_side(
+                &self.commit_diff_lines.join("\n"),
+                &self.style,
+                self.theme,
+                width,
+            );
+            self.commit_diff_render_width = width;
+        }
+        self.commit_diff_rendered.len().saturating_sub(rows)
+    }
+
+    pub(super) fn render(&mut self, cursor_on: bool) -> Result<(), String> {
         let mut out = io::stdout();
         let (w, h) = crossterm::terminal::size().map_err(|e| e.to_string())?;
         let w = w as usize;
         let h = h as usize;
 
-        queue!(
-            out,
-            BeginSynchronizedUpdate,
-            MoveTo(0, 0),
-            Clear(ClearType::All)
-        )
-        .map_err(|e| e.to_string())?;
+        queue!(out, BeginSynchronizedUpdate, MoveTo(0, 0)).map_err(|e| e.to_string())?;
 
         let title_raw = format!(
             "{} dusk git tui  {} {}  ⇄ {}  theme:{}",
@@ -243,7 +253,7 @@ impl App {
         lines
     }
 
-    fn render_diff(&self, width: usize, height: usize) -> Vec<String> {
+    fn render_diff(&mut self, width: usize, height: usize) -> Vec<String> {
         let mut lines = Vec::with_capacity(height);
         lines.push(if self.pane == Pane::Diff {
             self.color_cell(" DIFF ", width, self.theme.ok)
@@ -251,8 +261,22 @@ impl App {
             self.color_cell(" DIFF ", width, self.theme.accent)
         });
 
-        for line in self.diff_lines.iter().take(height.saturating_sub(1)) {
-            lines.push(color_diff_line(self, line, width));
+        if self.diff_render_width != width || self.diff_rendered.is_empty() {
+            self.diff_rendered = super::super::diffview::render_side_by_side(
+                &self.diff_lines.join("\n"),
+                &self.style,
+                self.theme,
+                width,
+            );
+            self.diff_render_width = width;
+        }
+        for line in self
+            .diff_rendered
+            .iter()
+            .take(height.saturating_sub(1))
+            .cloned()
+        {
+            lines.push(line);
         }
         while lines.len() < height {
             lines.push(" ".repeat(width));
@@ -287,9 +311,14 @@ impl App {
         lines
     }
 
-    fn render_commit_diff_tab(&self, width: usize, height: usize) -> Vec<String> {
+    fn render_commit_diff_tab(&mut self, width: usize, height: usize) -> Vec<String> {
         let mut lines = Vec::with_capacity(height);
-        lines.push(self.color_cell(" COMMIT DIFF (selected commit) ", width, self.theme.ok));
+        let sha = self
+            .selected_commit
+            .as_deref()
+            .map(|s| s.chars().take(12).collect::<String>())
+            .unwrap_or_else(|| "none".to_string());
+        lines.push(self.color_cell(&format!(" COMMIT DIFF ({sha}) "), width, self.theme.ok));
         if self.commit_diff_lines.is_empty() {
             lines.push(self.color_cell("No commit diff loaded", width, self.theme.warn));
             while lines.len() < height {
@@ -299,13 +328,26 @@ impl App {
         }
 
         let rows = height.saturating_sub(1);
+        if self.commit_diff_render_width != width || self.commit_diff_rendered.is_empty() {
+            self.commit_diff_rendered = super::super::diffview::render_side_by_side(
+                &self.commit_diff_lines.join("\n"),
+                &self.style,
+                self.theme,
+                width,
+            );
+            self.commit_diff_render_width = width;
+        }
+        let max_scroll = self.commit_diff_rendered.len().saturating_sub(rows);
+        if self.commit_diff_scroll > max_scroll {
+            self.commit_diff_scroll = max_scroll;
+        }
         for line in self
-            .commit_diff_lines
+            .commit_diff_rendered
             .iter()
             .skip(self.commit_diff_scroll)
             .take(rows)
         {
-            lines.push(color_diff_line(self, line, width));
+            lines.push(line.clone());
         }
         while lines.len() < height {
             lines.push(" ".repeat(width));
@@ -558,13 +600,7 @@ impl App {
 }
 
 fn draw_line(out: &mut io::Stdout, y: u16, line: &str) -> Result<(), String> {
-    queue!(
-        out,
-        MoveTo(0, y),
-        Clear(ClearType::CurrentLine),
-        Print(line)
-    )
-    .map_err(|e| e.to_string())
+    queue!(out, MoveTo(0, y), Print(line)).map_err(|e| e.to_string())
 }
 
 fn draw_at(out: &mut io::Stdout, x: u16, y: u16, line: &str) -> Result<(), String> {
@@ -606,23 +642,4 @@ fn color_log_line(app: &App, line: &str, width: usize) -> String {
         app.theme.info
     };
     app.style.paint(color, pad_display(line, width))
-}
-
-fn color_diff_line(app: &App, line: &str, width: usize) -> String {
-    if line.starts_with("@@") {
-        app.style.paint(app.theme.number, pad_display(line, width))
-    } else if line.starts_with('+') && !line.starts_with("+++") {
-        app.style.paint(app.theme.ok, pad_display(line, width))
-    } else if line.starts_with('-') && !line.starts_with("---") {
-        app.style.paint(app.theme.warn, pad_display(line, width))
-    } else if line.starts_with("commit ")
-        || line.starts_with("Author:")
-        || line.starts_with("Date:")
-        || line.starts_with("diff --git")
-        || line.starts_with("index ")
-    {
-        app.style.paint(app.theme.accent, pad_display(line, width))
-    } else {
-        app.style.paint(app.theme.info, pad_display(line, width))
-    }
 }

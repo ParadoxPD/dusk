@@ -6,9 +6,8 @@ Enhanced Git UX with both non-interactive views and an interactive TUI.
 
 ```bash
 dusk git log [theme]
-dusk git graph [theme]
 dusk git status [theme]
-dusk git viz [theme]
+dusk git diff [theme] [--staged] [--tui]
 dusk git tui [theme]
 dusk git interactive [theme]
 ```
@@ -17,8 +16,11 @@ Requires `git` in `PATH`.
 
 ## Non-interactive
 
-- `log` / `graph`: decorated history graph (VSCode-style overview)
-- `status` / `viz`: separated staged / modified / untracked sections
+- `log`: decorated history graph (VSCode-style overview)
+- `status`: separated staged / modified / untracked sections
+- `diff`: side-by-side line-numbered diff with syntax highlighting
+  - terminal mode by default
+  - isolated TUI mode with `--tui`
 
 ## Interactive TUI
 

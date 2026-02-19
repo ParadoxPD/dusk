@@ -120,18 +120,18 @@ fn print_help() {
         desc("# Informative git history graph")
     );
     println!(
-        "  {} {} {}  {}",
-        opt("dusk"),
-        cmd("git graph"),
-        arg("[theme]"),
-        desc("# Alias of git log")
-    );
-    println!(
         "  {} {} {} {}",
         opt("dusk"),
         cmd("git status"),
         arg("[theme]"),
         desc("# Staged/modified/untracked panel")
+    );
+    println!(
+        "  {} {} {} {}",
+        opt("dusk"),
+        cmd("git diff"),
+        arg("[theme] [--staged] [--tui]"),
+        desc("# Side-by-side diff (terminal or isolated TUI)")
     );
     println!(
         "  {} {} {}    {}",
@@ -191,5 +191,11 @@ fn print_help() {
         arg("--both target/release/dusk")
     );
     println!("  {} {} {}", opt("dusk"), cmd("git log"), arg(""));
+    println!(
+        "  {} {} {}",
+        opt("dusk"),
+        cmd("git diff"),
+        arg("--staged --tui")
+    );
     println!("  {} {} {}", opt("dusk"), cmd("git tui"), arg(""));
 }
