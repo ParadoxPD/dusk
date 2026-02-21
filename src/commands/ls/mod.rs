@@ -1,5 +1,6 @@
 use std::ffi::OsString;
 use std::fs;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 use crate::core::style::Style;
@@ -54,7 +55,11 @@ pub fn run(args: &[OsString]) -> Result<(), String> {
 
         let mut rows = Vec::new();
         for entry in &entries {
-            rows.push(build_row(entry, &opts, &style)?);
+            match build_row(entry, &opts, &style) {
+                Ok(row) => rows.push(row),
+                Err(err) if err.contains("Permission denied") => continue,
+                Err(err) => return Err(err),
+            }
         }
 
         sort_rows(&mut rows, opts.sort, opts.reverse);
@@ -72,8 +77,13 @@ fn collect_entries(path: &Path, opts: &Opts) -> Result<Vec<PathBuf>, String> {
         return Err(format!("no such file or directory: {}", path.display()));
     }
 
-    let mut items = fs::read_dir(path)
-        .map_err(|err| format!("failed reading {}: {err}", path.display()))?
+    let read_dir = match fs::read_dir(path) {
+        Ok(rd) => rd,
+        Err(err) if err.kind() == ErrorKind::PermissionDenied => return Ok(Vec::new()),
+        Err(err) => return Err(format!("failed reading {}: {err}", path.display())),
+    };
+
+    let mut items = read_dir
         .filter_map(Result::ok)
         .map(|e| e.path())
         .filter(|p| {

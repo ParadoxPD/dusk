@@ -316,6 +316,52 @@ fn status_panel(theme_name: Option<&str>) -> Result<(), String> {
     let style = Style::for_stdout();
     let branch = process::run_capture("git", &["branch", "--show-current"])
         .map_err(|err| format!("failed to read branch: {err}"))?;
+    let branch = branch.trim().to_string();
+    let upstream = process::run_capture(
+        "git",
+        &["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
+    )
+    .ok()
+    .map(|s| s.trim().to_string())
+    .filter(|s| !s.is_empty());
+
+    let branch_relation = if let Some(up) = &upstream {
+        match process::run_capture(
+            "git",
+            &[
+                "rev-list",
+                "--left-right",
+                "--count",
+                &format!("{up}...HEAD"),
+            ],
+        ) {
+            Ok(counts) => {
+                let parts = counts.split_whitespace().collect::<Vec<_>>();
+                if parts.len() == 2 {
+                    let behind = parts[0].parse::<usize>().unwrap_or(0);
+                    let ahead = parts[1].parse::<usize>().unwrap_or(0);
+                    if ahead == 0 && behind == 0 {
+                        format!("Your branch is up to date with '{}'.", up)
+                    } else if ahead > 0 && behind == 0 {
+                        format!("Your branch is ahead of '{}' by {} commit(s).", up, ahead)
+                    } else if ahead == 0 && behind > 0 {
+                        format!("Your branch is behind '{}' by {} commit(s).", up, behind)
+                    } else {
+                        format!(
+                            "Your branch and '{}' have diverged (ahead {}, behind {}).",
+                            up, ahead, behind
+                        )
+                    }
+                } else {
+                    format!("Tracking '{}'.", up)
+                }
+            }
+            Err(_) => format!("Tracking '{}'.", up),
+        }
+    } else {
+        "Your branch has no upstream branch.".to_string()
+    };
+
     let porcelain = process::run_capture("git", &["status", "--porcelain"])
         .map_err(|err| format!("failed to read status: {err}"))?;
 
@@ -323,9 +369,11 @@ fn status_panel(theme_name: Option<&str>) -> Result<(), String> {
         "{}",
         style.paint(
             theme.accent,
-            format!("{} Branch: {}", icons::ICON_BRANCH, branch.trim())
+            format!("{} On branch {}", icons::ICON_BRANCH, branch)
         )
     );
+    println!("{}", style.paint(theme.info, branch_relation));
+    println!();
 
     let mut staged = Vec::new();
     let mut modified = Vec::new();

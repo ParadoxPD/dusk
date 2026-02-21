@@ -1,6 +1,7 @@
 use std::cmp::Reverse;
 use std::fs;
 use std::fs::Metadata;
+use std::io::ErrorKind;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
@@ -47,8 +48,13 @@ fn render_dir(
         }
     }
 
-    let mut items = fs::read_dir(dir)
-        .map_err(|err| format!("failed reading {}: {err}", dir.display()))?
+    let read_dir = match fs::read_dir(dir) {
+        Ok(rd) => rd,
+        Err(err) if err.kind() == ErrorKind::PermissionDenied => return Ok(()),
+        Err(err) => return Err(format!("failed reading {}: {err}", dir.display())),
+    };
+
+    let mut items = read_dir
         .filter_map(Result::ok)
         .map(|e| e.path())
         .filter(|path| {

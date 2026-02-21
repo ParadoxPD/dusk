@@ -1,5 +1,7 @@
 use std::cmp;
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use crate::core::process;
 
@@ -382,16 +384,76 @@ impl App {
         self.overlay = Some(Overlay::Push);
         self.push_overlay_ok = None;
         self.push_overlay_lines = vec![
-            what,
+            what.clone(),
             format!("$ git {}", args.join(" ")),
             "Running push... input is blocked until completion.".to_string(),
         ];
         self.render(true)?;
 
-        let output = Command::new("git")
+        let mut child = Command::new("git")
             .args(args.iter().map(String::as_str))
-            .output()
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
             .map_err(|e| format!("git push failed to start: {e}"))?;
+
+        let frames = [
+            "██████░░░░░░░░░░░░░░",
+            "░██████░░░░░░░░░░░░░",
+            "░░██████░░░░░░░░░░░░",
+            "░░░██████░░░░░░░░░░░",
+            "░░░░██████░░░░░░░░░░",
+            "░░░░░██████░░░░░░░░░",
+            "░░░░░░██████░░░░░░░░",
+            "░░░░░░░██████░░░░░░░",
+            "░░░░░░░░██████░░░░░░",
+            "░░░░░░░░░██████░░░░░",
+            "░░░░░░░░░░██████░░░░",
+            "░░░░░░░░░░░██████░░░",
+            "░░░░░░░░░░░░██████░░",
+            "░░░░░░░░░░░░░██████░",
+            "░░░░░░░░░░░░░░██████",
+            "░░░░░░░░░░░░░██████░",
+            "░░░░░░░░░░░░██████░░",
+            "░░░░░░░░░░░██████░░░",
+            "░░░░░░░░░░██████░░░░",
+            "░░░░░░░░░██████░░░░░",
+            "░░░░░░░░██████░░░░░░",
+            "░░░░░░░██████░░░░░░░",
+            "░░░░░░██████░░░░░░░░",
+            "░░░░░██████░░░░░░░░░",
+            "░░░░██████░░░░░░░░░░",
+            "░░░██████░░░░░░░░░░░",
+            "░░██████░░░░░░░░░░░░",
+            "░██████░░░░░░░░░░░░░",
+        ];
+        let start = Instant::now();
+        let mut frame_idx = 0usize;
+        loop {
+            if child
+                .try_wait()
+                .map_err(|e| format!("git push failed during wait: {e}"))?
+                .is_some()
+            {
+                break;
+            }
+
+            let elapsed = start.elapsed().as_secs_f32();
+            self.push_overlay_lines = vec![
+                what.clone(),
+                format!("$ git {}", args.join(" ")),
+                format!("Progress: [{}]", frames[frame_idx % frames.len()]),
+                format!("Elapsed: {:.1}s", elapsed),
+                "Running push... input is blocked until completion.".to_string(),
+            ];
+            self.render(true)?;
+            frame_idx = frame_idx.wrapping_add(1);
+            thread::sleep(Duration::from_millis(70));
+        }
+
+        let output = child
+            .wait_with_output()
+            .map_err(|e| format!("git push failed to collect output: {e}"))?;
 
         let ok = output.status.success();
         self.push_overlay_ok = Some(ok);
@@ -400,6 +462,8 @@ impl App {
         } else {
             "Push failed.".to_string()
         }];
+        self.push_overlay_lines
+            .push("Progress: [████████████████████]".to_string());
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
