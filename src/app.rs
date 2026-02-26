@@ -23,6 +23,22 @@ pub fn run(argv: Vec<String>) -> Result<(), String> {
             let cat_args: Vec<OsString> = args.map(OsString::from).collect();
             commands::cat::run_cat(&cat_args)
         }
+        "rm" => {
+            let rm_args: Vec<OsString> = args.map(OsString::from).collect();
+            commands::rm::run(&rm_args)
+        }
+        "mv" => {
+            let mv_args: Vec<OsString> = args.map(OsString::from).collect();
+            commands::mv::run(&mv_args)
+        }
+        "cp" => {
+            let cp_args: Vec<OsString> = args.map(OsString::from).collect();
+            commands::cp::run(&cp_args)
+        }
+        "ln" => {
+            let ln_args: Vec<OsString> = args.map(OsString::from).collect();
+            commands::ln::run(&ln_args)
+        }
         "bat" => {
             let cat_args: Vec<OsString> = args.map(OsString::from).collect();
             commands::cat::run_bat(&cat_args)
@@ -90,6 +106,34 @@ fn print_help() {
         cmd("ls"),
         arg("[args...]"),
         desc("# Rust eza-style listing")
+    );
+    println!(
+        "  {} {} {}          {}",
+        opt("dusk"),
+        cmd("rm"),
+        arg("[args...]"),
+        desc("# Safe rm (trash by default) + trash scanner TUI")
+    );
+    println!(
+        "  {} {} {}          {}",
+        opt("dusk"),
+        cmd("mv"),
+        arg("[args...]"),
+        desc("# Safer mv passthrough with overwrite guard rails")
+    );
+    println!(
+        "  {} {} {}          {}",
+        opt("dusk"),
+        cmd("cp"),
+        arg("[args...]"),
+        desc("# Safer cp passthrough with overwrite guard rails")
+    );
+    println!(
+        "  {} {} {}          {}",
+        opt("dusk"),
+        cmd("ln"),
+        arg("[args...]"),
+        desc("# Safer ln passthrough + source/target prompt")
     );
     println!(
         "  {} {} {}         {}",
@@ -182,6 +226,15 @@ fn print_help() {
     println!("  {} {} {}", opt("dusk"), cmd("xtree"), arg("--tldr"));
     println!("  {} {} {}", opt("dusk"), cmd("xtree"), arg("--help"));
     println!("  {} {} {}", opt("dusk"), cmd("ls"), arg("-laht"));
+    println!("  {} {} {}", opt("dusk"), cmd("rm"), arg("-r build/"));
+    println!("  {} {} {}", opt("dusk"), cmd("mv"), arg("a.txt b.txt"));
+    println!("  {} {} {}", opt("dusk"), cmd("cp"), arg("-r src/ backup/"));
+    println!(
+        "  {} {} {}",
+        opt("dusk"),
+        cmd("ln"),
+        arg("-s target linkname")
+    );
     println!("  {} {} {}", opt("dusk"), cmd("cat"), arg("src/main.rs"));
     println!("  {} {} {}", opt("dusk"), cmd("bat"), arg("src/main.rs"));
     println!(

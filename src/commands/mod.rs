@@ -1,8 +1,13 @@
 pub mod cat;
+pub mod cp;
 pub mod diff;
 pub mod dump;
+pub mod fsops;
 pub mod git;
+pub mod ln;
 pub mod ls;
+pub mod mv;
 pub mod passthrough;
+pub mod rm;
 pub mod themes;
 pub mod xtree;

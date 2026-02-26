@@ -106,6 +106,24 @@ fn bench_dump_help(c: &mut Criterion) {
     });
 }
 
+fn bench_rm_help(c: &mut Criterion) {
+    c.bench_function("cmd_rm_help", |b| {
+        b.iter(|| run_bin(&[black_box("rm"), black_box("--help")]))
+    });
+}
+
+fn bench_safe_fsops_help(c: &mut Criterion) {
+    c.bench_function("cmd_mv_help", |b| {
+        b.iter(|| run_bin(&[black_box("mv"), black_box("--help")]))
+    });
+    c.bench_function("cmd_cp_help", |b| {
+        b.iter(|| run_bin(&[black_box("cp"), black_box("--help")]))
+    });
+    c.bench_function("cmd_ln_help", |b| {
+        b.iter(|| run_bin(&[black_box("ln"), black_box("--help")]))
+    });
+}
+
 criterion_group!(
     benches,
     bench_help,
@@ -114,6 +132,8 @@ criterion_group!(
     bench_tree_and_xtree,
     bench_git_and_diff_help,
     bench_themes,
-    bench_dump_help
+    bench_dump_help,
+    bench_rm_help,
+    bench_safe_fsops_help
 );
 criterion_main!(benches);

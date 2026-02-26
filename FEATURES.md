@@ -9,6 +9,10 @@ This document outlines all `dusk` subcommands, flags, and compatibility notes.
 - `dusk tree [OPTIONS] [DIRECTORY]` (alias of `xtree`)
 - `dusk ls [OPTIONS] [FILE|DIR]...`
 - `dusk eza [OPTIONS] [FILE|DIR]...` (alias of `ls`)
+- `dusk rm [OPTIONS] FILE...`
+- `dusk mv [OPTIONS] SOURCE... DEST`
+- `dusk cp [OPTIONS] SOURCE... DEST`
+- `dusk ln [OPTIONS] TARGET LINK_NAME`
 - `dusk cat [OPTIONS] [FILE]...`
 - `dusk bat [OPTIONS] [FILE]...`
 - `dusk git log [theme]`
@@ -60,6 +64,48 @@ This document outlines all `dusk` subcommands, flags, and compatibility notes.
 - Notes:
   - `cat` defaults to plain mode.
   - `bat` defaults to pretty mode with lexical syntax highlighting.
+
+## `rm`
+
+- Purpose:
+  - Safe delete by default (move to trash).
+  - Drop-in style flags for common `rm` workflows.
+  - Interactive scanner TUI for managing trash entries.
+- Major options:
+  - `-f`, `--force`
+  - `-i`, `--interactive`
+  - `-r`, `-R`, `--recursive`
+  - `-v`, `--verbose`
+  - `-P`, `--permanent` (hard delete)
+  - `--trash` (explicit soft delete)
+  - `--trash-tui`, `--scan-trash`
+- TUI keys:
+  - `j/k` or arrows move
+  - `space` mark/unmark
+  - `r` restore selected/marked
+  - `d` permanently delete selected/marked
+  - `g/G` top/bottom
+  - `q`/`Esc` quit
+- Notes:
+  - Default behavior is soft delete to trash.
+  - `--permanent` bypasses trash and removes directly.
+  - `DUSK_TRASH_DIR` can override trash location.
+
+## `mv` / `cp` / `ln`
+
+- Purpose:
+  - Use system binaries for compatibility.
+  - Add safety prompt before overwriting existing targets.
+  - Offer sudo retry prompt for ownership mismatch on Unix systems.
+- Shared behavior:
+  - `-f` bypasses overwrite prompt.
+  - `-n` skips overwrite when target exists.
+  - `-i` enables interactive behavior.
+  - `-v` passes verbose behavior through to system binary.
+- Command specifics:
+  - `mv`: safe move wrapper around system `mv`.
+  - `cp`: safe copy wrapper around system `cp` (supports recursive copy flags).
+  - `ln`: safe link wrapper around system `ln`; prompts for source/target when missing.
 
 ## `git`
 
@@ -151,6 +197,8 @@ Default theme: `onedark-pro`
 - [`docs/xtree.md`](docs/xtree.md)
 - [`docs/ls.md`](docs/ls.md)
 - [`docs/cat-bat.md`](docs/cat-bat.md)
+- [`docs/rm.md`](docs/rm.md)
+- [`docs/mv-cp-ln.md`](docs/mv-cp-ln.md)
 - [`docs/git.md`](docs/git.md)
 - [`docs/diff.md`](docs/diff.md)
 - [`docs/dump.md`](docs/dump.md)

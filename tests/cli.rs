@@ -56,6 +56,227 @@ fn ls_h_is_human_not_help() {
 }
 
 #[test]
+fn rm_help_is_available() {
+    dusk()
+        .args(["rm", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("safe rm"))
+        .stdout(predicate::str::contains("--trash-tui"));
+}
+
+#[test]
+fn rm_default_moves_file_to_trash() {
+    let td = tempdir().expect("tmpdir");
+    let trash = td.path().join(".trash");
+    let file = td.path().join("deleteme.txt");
+    fs::write(&file, "x").expect("write");
+
+    dusk()
+        .env("DUSK_TRASH_DIR", trash.to_string_lossy().to_string())
+        .args(["rm", file.to_string_lossy().as_ref()])
+        .assert()
+        .success();
+
+    assert!(!file.exists());
+    assert!(trash.join("files").exists());
+    let moved_count = fs::read_dir(trash.join("files"))
+        .expect("read files")
+        .filter_map(Result::ok)
+        .count();
+    assert_eq!(moved_count, 1);
+}
+
+#[test]
+fn rm_permanent_deletes_file() {
+    let td = tempdir().expect("tmpdir");
+    let trash = td.path().join(".trash");
+    let file = td.path().join("hard-delete.txt");
+    fs::write(&file, "x").expect("write");
+
+    dusk()
+        .env("DUSK_TRASH_DIR", trash.to_string_lossy().to_string())
+        .args(["rm", "-P", file.to_string_lossy().as_ref()])
+        .assert()
+        .success();
+
+    assert!(!file.exists());
+    let files_dir = trash.join("files");
+    if files_dir.exists() {
+        let moved_count = fs::read_dir(files_dir)
+            .expect("read files")
+            .filter_map(Result::ok)
+            .count();
+        assert_eq!(moved_count, 0);
+    }
+}
+
+#[test]
+fn rm_dir_requires_recursive() {
+    let td = tempdir().expect("tmpdir");
+    let dir = td.path().join("subdir");
+    fs::create_dir_all(&dir).expect("mkdir");
+
+    dusk()
+        .args(["rm", dir.to_string_lossy().as_ref()])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Is a directory"));
+
+    assert!(dir.exists());
+}
+
+#[test]
+fn rm_recursive_moves_directory_to_trash() {
+    let td = tempdir().expect("tmpdir");
+    let trash = td.path().join(".trash");
+    let dir = td.path().join("subdir");
+    fs::create_dir_all(&dir).expect("mkdir");
+    fs::write(dir.join("a.txt"), "hello").expect("write");
+
+    dusk()
+        .env("DUSK_TRASH_DIR", trash.to_string_lossy().to_string())
+        .args(["rm", "-r", dir.to_string_lossy().as_ref()])
+        .assert()
+        .success();
+
+    assert!(!dir.exists());
+    assert!(trash.join("files").exists());
+}
+
+#[test]
+fn rm_restore_restores_file_from_trash() {
+    let td = tempdir().expect("tmpdir");
+    let trash = td.path().join(".trash");
+    let file = td.path().join("restore-me.txt");
+    fs::write(&file, "x").expect("write");
+
+    dusk()
+        .env("DUSK_TRASH_DIR", trash.to_string_lossy().to_string())
+        .args(["rm", file.to_string_lossy().as_ref()])
+        .assert()
+        .success();
+    assert!(!file.exists());
+
+    dusk()
+        .env("DUSK_TRASH_DIR", trash.to_string_lossy().to_string())
+        .args(["rm", "--restore", "restore-me"])
+        .write_stdin("y\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("restored"));
+
+    assert!(file.exists());
+}
+
+#[test]
+fn rm_empty_trash_clears_all_items() {
+    let td = tempdir().expect("tmpdir");
+    let trash = td.path().join(".trash");
+    let file1 = td.path().join("e1.txt");
+    let file2 = td.path().join("e2.txt");
+    fs::write(&file1, "x").expect("write");
+    fs::write(&file2, "x").expect("write");
+
+    dusk()
+        .env("DUSK_TRASH_DIR", trash.to_string_lossy().to_string())
+        .args([
+            "rm",
+            file1.to_string_lossy().as_ref(),
+            file2.to_string_lossy().as_ref(),
+        ])
+        .assert()
+        .success();
+
+    dusk()
+        .env("DUSK_TRASH_DIR", trash.to_string_lossy().to_string())
+        .args(["rm", "--empty-trash", "-f"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("deleted"));
+
+    let count = fs::read_dir(trash.join("files"))
+        .expect("read files")
+        .filter_map(Result::ok)
+        .count();
+    assert_eq!(count, 0);
+}
+
+#[test]
+fn mv_cp_ln_help_available() {
+    dusk().args(["mv", "--help"]).assert().success();
+    dusk().args(["cp", "--help"]).assert().success();
+    dusk().args(["ln", "--help"]).assert().success();
+}
+
+#[test]
+fn mv_conflict_prompts_and_can_cancel() {
+    let td = tempdir().expect("tmpdir");
+    let src = td.path().join("src.txt");
+    let dst = td.path().join("dst.txt");
+    fs::write(&src, "src").expect("write src");
+    fs::write(&dst, "dst").expect("write dst");
+
+    dusk()
+        .args([
+            "mv",
+            src.to_string_lossy().as_ref(),
+            dst.to_string_lossy().as_ref(),
+        ])
+        .write_stdin("n\n")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("operation cancelled"));
+
+    assert!(src.exists());
+    assert_eq!(fs::read_to_string(&dst).expect("read dst"), "dst");
+}
+
+#[test]
+fn cp_conflict_prompts_and_can_confirm() {
+    let td = tempdir().expect("tmpdir");
+    let src = td.path().join("copy-src.txt");
+    let dst = td.path().join("copy-dst.txt");
+    fs::write(&src, "src").expect("write src");
+    fs::write(&dst, "dst").expect("write dst");
+
+    dusk()
+        .args([
+            "cp",
+            src.to_string_lossy().as_ref(),
+            dst.to_string_lossy().as_ref(),
+        ])
+        .write_stdin("y\n")
+        .assert()
+        .success();
+
+    assert_eq!(fs::read_to_string(&dst).expect("read dst"), "src");
+}
+
+#[test]
+fn ln_creates_symlink() {
+    #[cfg(unix)]
+    {
+        let td = tempdir().expect("tmpdir");
+        let src = td.path().join("target.txt");
+        let dst = td.path().join("link.txt");
+        fs::write(&src, "x").expect("write src");
+
+        dusk()
+            .args([
+                "ln",
+                "-s",
+                src.to_string_lossy().as_ref(),
+                dst.to_string_lossy().as_ref(),
+            ])
+            .assert()
+            .success();
+
+        assert!(dst.exists());
+    }
+}
+
+#[test]
 fn ls_all_shows_implied_dot_entries_and_almost_all_hides_them() {
     let td = tempdir().expect("tmpdir");
     fs::write(td.path().join(".hidden"), "x").expect("write hidden");
@@ -316,6 +537,30 @@ fn find_requires_find_binary() {
         .assert()
         .failure()
         .stderr(predicate::str::contains("required system binary `find`"));
+}
+
+#[test]
+fn mv_cp_ln_require_system_binaries() {
+    dusk()
+        .env("PATH", "/definitely/missing/path")
+        .args(["mv", "--help"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("required system binary `mv`"));
+
+    dusk()
+        .env("PATH", "/definitely/missing/path")
+        .args(["cp", "--help"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("required system binary `cp`"));
+
+    dusk()
+        .env("PATH", "/definitely/missing/path")
+        .args(["ln", "--help"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("required system binary `ln`"));
 }
 
 #[test]

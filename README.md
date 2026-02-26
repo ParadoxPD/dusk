@@ -11,6 +11,8 @@
 ## Highlights
 
 - Native Rust implementations for `tree` (`xtree`), `ls` (`eza` alias), `cat`, and `bat`-style view
+- Safe `rm` replacement with soft-delete trash, hard-delete flag, and interactive trash scanner TUI
+- Safe wrappers for `mv`, `cp`, and `ln` with overwrite guard rails and sudo retry prompt (Unix)
 - Native LOC reporting in `xtree` (`--loc`) and LOC-aware `--stats`
 - Full-color theming with terminal-capability-aware ANSI behavior (no ANSI leakage on pipes/files)
 - Git graph/status + interactive TUI with tabs, palette, overlays, staging/commit/push/branch operations
@@ -34,6 +36,10 @@ dusk xtree [OPTIONS] [DIRECTORY]
 dusk tree [OPTIONS] [DIRECTORY]
 dusk ls [OPTIONS] [FILE|DIR]...
 dusk eza [OPTIONS] [FILE|DIR]...
+dusk rm [OPTIONS] FILE...
+dusk mv [OPTIONS] SOURCE... DEST
+dusk cp [OPTIONS] SOURCE... DEST
+dusk ln [OPTIONS] TARGET LINK_NAME
 dusk cat [OPTIONS] [FILE]...
 dusk bat [OPTIONS] [FILE]...
 
@@ -61,6 +67,8 @@ dusk grep [args...]
   - [`docs/xtree.md`](docs/xtree.md)
   - [`docs/ls.md`](docs/ls.md)
   - [`docs/cat-bat.md`](docs/cat-bat.md)
+  - [`docs/rm.md`](docs/rm.md)
+  - [`docs/mv-cp-ln.md`](docs/mv-cp-ln.md)
   - [`docs/git.md`](docs/git.md)
   - [`docs/diff.md`](docs/diff.md)
   - [`docs/dump.md`](docs/dump.md)

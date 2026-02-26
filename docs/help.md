@@ -32,6 +32,7 @@ All three forms print the same top-level command map.
 dusk help
 dusk xtree --tldr
 dusk ls --help
+dusk rm --help
 dusk git --help
 dusk dump --help
 ```
@@ -41,6 +42,8 @@ dusk dump --help
 - [`xtree/tree`](xtree.md)
 - [`ls/eza`](ls.md)
 - [`cat/bat`](cat-bat.md)
+- [`rm`](rm.md)
+- [`mv/cp/ln`](mv-cp-ln.md)
 - [`git`](git.md)
 - [`diff`](diff.md)
 - [`dump`](dump.md)

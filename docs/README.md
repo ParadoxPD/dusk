@@ -6,6 +6,8 @@ This folder contains detailed docs for every `dusk` command.
 - [`xtree` / `tree`](xtree.md)
 - [`ls` / `eza`](ls.md)
 - [`cat` / `bat`](cat-bat.md)
+- [`rm` (safe delete + trash scanner)](rm.md)
+- [`mv` / `cp` / `ln` safe wrappers](mv-cp-ln.md)
 - [`git` (non-interactive + TUI)](git.md)
 - [`diff`](diff.md)
 - [`dump`](dump.md)
