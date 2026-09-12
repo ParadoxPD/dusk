@@ -1,4 +1,5 @@
 use std::cmp;
+use std::collections::HashSet;
 use std::io::{self, Write};
 
 use crossterm::cursor::MoveTo;
@@ -10,15 +11,20 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 use super::*;
 
 impl App {
-    fn ensure_diff_rendered(&mut self, width: usize) {
-        if self.diff_render_width != width || self.diff_rendered.is_empty() {
-            self.diff_rendered = super::super::diffview::render_side_by_side(
-                &self.diff_lines.join("\n"),
+    fn ensure_view_rendered(&mut self, detail: bool, width: usize) {
+        let view = if detail {
+            &mut self.detail_diff
+        } else {
+            &mut self.workspace_diff
+        };
+        if view.render_width != width || view.rendered.is_empty() {
+            view.rendered = super::super::diffview::render_side_by_side(
+                &view.lines.join("\n"),
                 &self.style,
                 self.theme,
                 width,
             );
-            self.diff_render_width = width;
+            view.render_width = width;
         }
     }
 
@@ -34,27 +40,20 @@ impl App {
         }
     }
 
-    fn diff_window(&mut self, width: usize, height: usize) -> (usize, usize) {
-        self.ensure_diff_rendered(width);
+    fn diff_window(&mut self, detail: bool, width: usize, height: usize) -> (usize, usize) {
+        self.ensure_view_rendered(detail, width);
         let rows = height.saturating_sub(1);
-        self.diff_view_rows = rows;
-        let max_scroll = self.diff_rendered.len().saturating_sub(rows);
-        if self.diff_scroll > max_scroll {
-            self.diff_scroll = max_scroll;
+        let view = if detail {
+            &mut self.detail_diff
+        } else {
+            &mut self.workspace_diff
+        };
+        view.view_rows = rows;
+        let max_scroll = view.rendered.len().saturating_sub(rows);
+        if view.scroll > max_scroll {
+            view.scroll = max_scroll;
         }
-        (self.diff_scroll, rows)
-    }
-
-    fn ensure_commit_diff_rendered(&mut self, width: usize) {
-        if self.commit_diff_render_width != width || self.commit_diff_rendered.is_empty() {
-            self.commit_diff_rendered = super::super::diffview::render_side_by_side(
-                &self.commit_diff_lines.join("\n"),
-                &self.style,
-                self.theme,
-                width,
-            );
-            self.commit_diff_render_width = width;
-        }
+        (view.scroll, rows)
     }
 
     fn commit_diff_header(&self, width: usize) -> String {
@@ -64,17 +63,6 @@ impl App {
             .map(|s| s.chars().take(12).collect::<String>())
             .unwrap_or_else(|| "none".to_string());
         self.color_cell(&format!(" COMMIT DIFF ({sha}) "), width, self.theme.ok)
-    }
-
-    fn commit_diff_window(&mut self, width: usize, height: usize) -> (usize, usize) {
-        self.ensure_commit_diff_rendered(width);
-        let rows = height.saturating_sub(1);
-        self.commit_diff_view_rows = rows;
-        let max_scroll = self.commit_diff_rendered.len().saturating_sub(rows);
-        if self.commit_diff_scroll > max_scroll {
-            self.commit_diff_scroll = max_scroll;
-        }
-        (self.commit_diff_scroll, rows)
     }
 
     pub(super) fn render(&mut self, cursor_on: bool) -> Result<(), String> {
@@ -96,7 +84,7 @@ impl App {
         let title = self
             .style
             .paint(self.theme.title, pad_display(&title_raw, w));
-        let hint_raw = "j/k move  1/2/3 tabs  s/u stage  A/U all  c commit  p push  R push-remote  t theme  Ctrl+P palette  ? help  q quit";
+        let hint_raw = "j/k move  1/2/3/4/5 tabs  r refresh  z stash  f fetch  L pull  B branches  Ctrl+P palette  ? help  q quit";
         let hint = self
             .style
             .paint(self.theme.subtle, pad_display(hint_raw, w));
@@ -120,7 +108,7 @@ impl App {
                     let files = self.render_files(w, status_h);
                     let logs = self.render_log(w, log_h);
                     let diff_header = self.diff_header(w);
-                    let (diff_start, diff_rows) = self.diff_window(w, diff_h);
+                    let (diff_start, diff_rows) = self.diff_window(false, w, diff_h);
                     let diff_blank = " ".repeat(w);
 
                     let mut row = 3usize;
@@ -137,7 +125,8 @@ impl App {
                     row += 1;
                     for i in 0..diff_rows {
                         let line = self
-                            .diff_rendered
+                            .workspace_diff
+                            .rendered
                             .get(diff_start + i)
                             .map(String::as_str)
                             .unwrap_or(diff_blank.as_str());
@@ -153,7 +142,7 @@ impl App {
                     let files = self.render_files(left_w, body_h);
                     let logs = self.render_log(right_w, log_h);
                     let diff_header = self.diff_header(right_w);
-                    let (diff_start, diff_rows) = self.diff_window(right_w, diff_h);
+                    let (diff_start, diff_rows) = self.diff_window(false, right_w, diff_h);
                     let left_blank = " ".repeat(left_w);
                     let right_blank = " ".repeat(right_w);
 
@@ -173,7 +162,8 @@ impl App {
                             } else {
                                 let idx = drow - 1;
                                 if idx < diff_rows {
-                                    self.diff_rendered
+                                    self.workspace_diff
+                                        .rendered
                                         .get(diff_start + idx)
                                         .map(String::as_str)
                                         .unwrap_or(right_blank.as_str())
@@ -194,31 +184,18 @@ impl App {
                 }
             }
             Tab::CommitDiff => {
-                let header = self.commit_diff_header(w);
-                draw_line(&mut out, 3, &header)?;
-                if self.commit_diff_lines.is_empty() {
-                    draw_line(
-                        &mut out,
-                        4,
-                        &self.color_cell("No commit diff loaded", w, self.theme.warn),
-                    )?;
-                    for row in 5..(body_h + 3) {
-                        draw_line(&mut out, row as u16, &" ".repeat(w))?;
-                    }
-                } else {
-                    let (start, rows) = self.commit_diff_window(w, body_h);
-                    let blank = " ".repeat(w);
-                    for i in 0..rows {
-                        let line = self
-                            .commit_diff_rendered
-                            .get(start + i)
-                            .map(String::as_str)
-                            .unwrap_or(blank.as_str());
-                        draw_line(&mut out, (4 + i) as u16, line)?;
-                    }
-                    for row in (4 + rows)..(body_h + 3) {
-                        draw_line(&mut out, row as u16, blank.as_str())?;
-                    }
+                self.render_detail_diff_tab(&mut out, w, body_h)?;
+            }
+            Tab::Conflicts => {
+                let conflicts = self.render_conflicts_tab(w, body_h);
+                for (row, line) in conflicts.into_iter().enumerate() {
+                    draw_line(&mut out, (row + 3) as u16, &line)?;
+                }
+            }
+            Tab::Stashes => {
+                let stashes = self.render_stashes_tab(w, body_h);
+                for (row, line) in stashes.into_iter().enumerate() {
+                    draw_line(&mut out, (row + 3) as u16, &line)?;
                 }
             }
         }
@@ -231,6 +208,11 @@ impl App {
                 Overlay::Help => self.render_help_overlay(&mut out, w, h)?,
                 Overlay::Palette => self.render_palette_overlay(&mut out, w, h, cursor_on)?,
                 Overlay::Push => self.render_push_overlay(&mut out, w, h)?,
+                Overlay::BranchPicker => self.render_branch_picker_overlay(&mut out, w, h)?,
+                Overlay::ConflictResolver => self.render_conflict_overlay(&mut out, w, h)?,
+                Overlay::ResetPicker => self.render_reset_picker_overlay(&mut out, w, h)?,
+                Overlay::SquashPicker => self.render_squash_picker_overlay(&mut out, w, h)?,
+                Overlay::Confirm => self.render_confirm_overlay(&mut out, w, h)?,
             }
         }
 
@@ -251,13 +233,15 @@ impl App {
             }
         };
         let raw = format!(
-            "{}  {}  {}    {}",
+            "{}  {}  {}  {}  {}    {}",
             tab("1 Workspace", self.tab == Tab::Workspace),
             tab("2 Graph", self.tab == Tab::Graph),
             tab("3 CommitDiff", self.tab == Tab::CommitDiff),
+            tab("4 Conflicts", self.tab == Tab::Conflicts),
+            tab("5 Stashes", self.tab == Tab::Stashes),
             self.style.paint(
                 self.theme.accent,
-                "(:cmd, :cmdhelp, ? help, Ctrl+P palette)"
+                "(:cmd, :cmdhelp, :fetch, :pull, :branches, ? help, Ctrl+P palette)"
             )
         );
         pad_display(&raw, width)
@@ -378,16 +362,112 @@ impl App {
         lines
     }
 
+    fn render_detail_diff_tab(
+        &mut self,
+        out: &mut io::Stdout,
+        width: usize,
+        height: usize,
+    ) -> Result<(), String> {
+        let label = match self.detail_diff_mode {
+            DetailDiffMode::Commit => self
+                .selected_commit
+                .as_deref()
+                .map(|sha| format!(" COMMIT DIFF ({})  d: mode ", &sha[..sha.len().min(12)]))
+                .unwrap_or_else(|| " COMMIT DIFF (none)  d: mode ".to_string()),
+            DetailDiffMode::Repo => " REPOSITORY DIFF  d: mode ".to_string(),
+            DetailDiffMode::SelectedFile => " FILE DIFF  d: mode, h/l: files/diff ".to_string(),
+        };
+
+        if self.detail_diff_mode != DetailDiffMode::SelectedFile || width < 88 {
+            let header = self.color_cell(&label, width, self.theme.ok);
+            draw_line(out, 3, &header)?;
+            let (start, rows) = self.diff_window(true, width, height);
+            let blank = " ".repeat(width);
+            for i in 0..rows {
+                let line = self
+                    .detail_diff
+                    .rendered
+                    .get(start + i)
+                    .map(String::as_str)
+                    .unwrap_or(blank.as_str());
+                draw_line(out, (4 + i) as u16, line)?;
+            }
+            return Ok(());
+        }
+
+        let selector_w = cmp::min(32, width / 3).max(20);
+        let diff_w = width.saturating_sub(selector_w + 1);
+        let selector = self.render_compact_file_selector(selector_w, height);
+        let header = self.color_cell(&label, diff_w, self.theme.ok);
+        let (start, rows) = self.diff_window(true, diff_w, height);
+        let left_blank = " ".repeat(selector_w);
+        let right_blank = " ".repeat(diff_w);
+
+        for row in 0..height {
+            let left = selector
+                .get(row)
+                .map(String::as_str)
+                .unwrap_or(left_blank.as_str());
+            let right = if row == 0 {
+                header.as_str()
+            } else if row - 1 < rows {
+                self.detail_diff
+                    .rendered
+                    .get(start + row - 1)
+                    .map(String::as_str)
+                    .unwrap_or(right_blank.as_str())
+            } else {
+                right_blank.as_str()
+            };
+            let sep = self.style.paint(self.theme.accent, "│");
+            draw_line(out, (row + 3) as u16, &format!("{left}{sep}{right}"))?;
+        }
+        Ok(())
+    }
+
+    fn render_compact_file_selector(&self, width: usize, height: usize) -> Vec<String> {
+        let mut lines = Vec::with_capacity(height);
+        let active = self.detail_pane == DetailPane::Files;
+        lines.push(self.color_cell(
+            " CHANGED FILES ",
+            width,
+            if active { self.theme.ok } else { self.theme.accent },
+        ));
+        let order = self.file_selection_order();
+        if order.is_empty() {
+            lines.push(self.color_cell(" clean ", width, self.theme.info));
+        } else {
+            let selected_pos = order.iter().position(|idx| *idx == self.selected).unwrap_or(0);
+            let start = selected_pos.saturating_sub(height.saturating_sub(2));
+            for idx in order.iter().skip(start).take(height.saturating_sub(1)) {
+                let file = &self.files[*idx];
+                let row = format!("{} {}", file.tag(), file.display_path);
+                let color = if *idx == self.selected {
+                    "\x1b[1;97;44m"
+                } else {
+                    self.theme.info
+                };
+                lines.push(self.color_cell(&row, width, color));
+            }
+        }
+        while lines.len() < height {
+            lines.push(" ".repeat(width));
+        }
+        lines
+    }
+
     fn render_status_line(&self, width: usize, cursor_on: bool) -> String {
         let cursor = if cursor_on { "▍" } else { " " };
         let mode = match self.input_mode {
             InputMode::None => String::new(),
             InputMode::Commit => format!("commit msg: {}{cursor}", self.input),
             InputMode::NewBranch => format!("new branch: {}{cursor}", self.input),
-            InputMode::SwitchBranch => format!("switch branch: {}{cursor}", self.input),
             InputMode::PushRemote => {
                 format!("push remote branch: {}{cursor}  (origin main)", self.input)
             }
+            InputMode::StashMessage => format!("stash message (optional): {}{cursor}", self.input),
+            InputMode::Gitignore => format!(".gitignore entry: {}{cursor}", self.input),
+            InputMode::SquashMessage => format!("squash commit message: {}{cursor}", self.input),
             InputMode::Command => format!(":{}{}", self.input, cursor),
         };
 
@@ -400,6 +480,72 @@ impl App {
         }
     }
 
+    fn render_conflicts_tab(&self, width: usize, height: usize) -> Vec<String> {
+        let mut lines = Vec::with_capacity(height);
+        lines.push(self.color_cell(
+            " CONFLICTS (space mark, a mark-all, o/i ours/theirs, O/I all ours/theirs, m add, x abort) ",
+            width,
+            self.theme.ok,
+        ));
+        let conflicts = self.conflict_paths();
+        if conflicts.is_empty() {
+            lines.push(self.color_cell("No merge conflicts", width, self.theme.info));
+            while lines.len() < height {
+                lines.push(" ".repeat(width));
+            }
+            return lines;
+        }
+        let rows = height.saturating_sub(1);
+        let start = self
+            .conflict_selected
+            .saturating_sub(rows.saturating_sub(1));
+        for (offset, path) in conflicts.iter().skip(start).take(rows).enumerate() {
+            let idx = start + offset;
+            let mark = if self.conflict_marked.contains(path) {
+                "*"
+            } else {
+                " "
+            };
+            let line = format!("{mark} {path}");
+            if idx == self.conflict_selected {
+                lines.push(self.color_cell(&line, width, "\x1b[1;97;44m"));
+            } else if self.conflict_marked.contains(path) {
+                lines.push(self.color_cell(&line, width, self.theme.accent));
+            } else {
+                lines.push(self.color_cell(&line, width, self.theme.warn));
+            }
+        }
+        while lines.len() < height {
+            lines.push(" ".repeat(width));
+        }
+        lines
+    }
+
+    fn render_stashes_tab(&self, width: usize, height: usize) -> Vec<String> {
+        let mut lines = Vec::with_capacity(height);
+        lines.push(self.color_cell(
+            " STASHES (z create, a apply, p pop, j/k select) ",
+            width,
+            self.theme.ok,
+        ));
+        if self.stashes.is_empty() {
+            lines.push(self.color_cell("No stashes", width, self.theme.info));
+        } else {
+            let rows = height.saturating_sub(1);
+            let start = self.stash_selected.saturating_sub(rows.saturating_sub(1));
+            for (offset, stash) in self.stashes.iter().skip(start).take(rows).enumerate() {
+                let idx = start + offset;
+                let text = format!("{:<10} {:<14} {}", stash.reference, stash.age, stash.message);
+                let color = if idx == self.stash_selected { "\x1b[1;97;44m" } else { self.theme.info };
+                lines.push(self.color_cell(&text, width, color));
+            }
+        }
+        while lines.len() < height {
+            lines.push(" ".repeat(width));
+        }
+        lines
+    }
+
     fn render_help_overlay(&self, out: &mut io::Stdout, w: usize, h: usize) -> Result<(), String> {
         let lines: Vec<(String, &'static str)> = vec![
             ("Navigation".to_string(), self.theme.ok),
@@ -408,7 +554,7 @@ impl App {
                 self.theme.info,
             ),
             (
-                "1 Workspace, 2 Graph, 3 CommitDiff".to_string(),
+                "1 Workspace, 2 Graph, 3 DetailDiff, 4 Conflicts, 5 Stashes".to_string(),
                 self.theme.info,
             ),
             (
@@ -423,11 +569,17 @@ impl App {
             ),
             ("A/U stage all or unstage all".to_string(), self.theme.info),
             (
-                "c commit, p push current, R push remote branch".to_string(),
+                "c commit, p push current, R push remote branch, f fetch, L pull".to_string(),
                 self.theme.info,
             ),
             (
-                "b create branch, B switch branch, D toggle repo/file diff".to_string(),
+                "b create branch, B branch picker, m conflict resolver, D toggle repo/file diff"
+                    .to_string(),
+                self.theme.info,
+            ),
+            (
+                "In Conflicts tab: space mark, a mark-all, o/i ours/theirs, O/I all, x abort"
+                    .to_string(),
                 self.theme.info,
             ),
             ("".to_string(), self.theme.info),
@@ -441,7 +593,8 @@ impl App {
                 self.theme.info,
             ),
             (
-                ":push-remote <remote>/<branch> or <remote> <branch>".to_string(),
+                ":fetch :pull :branches :resolve-conflict :push-remote <remote>/<branch>"
+                    .to_string(),
                 self.theme.info,
             ),
             ("".to_string(), self.theme.info),
@@ -551,7 +704,169 @@ impl App {
             lines.push((line.clone(), color));
         }
 
-        self.draw_center_overlay(out, w, h, " Push ", &lines)
+        self.draw_center_overlay(
+            out,
+            w,
+            h,
+            &format!(" {} ", self.action_overlay_title),
+            &lines,
+        )
+    }
+
+    fn render_branch_picker_overlay(
+        &self,
+        out: &mut io::Stdout,
+        w: usize,
+        h: usize,
+    ) -> Result<(), String> {
+        let mut lines: Vec<(String, &'static str)> = Vec::new();
+        lines.push((
+            "j/k move, Enter switch, Esc close".to_string(),
+            self.theme.subtle,
+        ));
+        lines.push(("".to_string(), self.theme.info));
+        if self.branch_choices.is_empty() {
+            lines.push(("No branches found".to_string(), self.theme.warn));
+        } else {
+            let max_items = 14usize;
+            let window_start = if self.branch_pick_selected >= max_items {
+                self.branch_pick_selected + 1 - max_items
+            } else {
+                0
+            };
+            for (i, name) in self
+                .branch_choices
+                .iter()
+                .skip(window_start)
+                .take(max_items)
+                .enumerate()
+            {
+                let idx = window_start + i;
+                let prefix = if idx == self.branch_pick_selected {
+                    ">"
+                } else {
+                    " "
+                };
+                let marker = if name == &self.branch { "*" } else { " " };
+                let color = if idx == self.branch_pick_selected {
+                    self.theme.ok
+                } else if marker == "*" {
+                    self.theme.accent
+                } else {
+                    self.theme.info
+                };
+                lines.push((format!("{prefix} {marker} {name}"), color));
+            }
+        }
+        self.draw_center_overlay(out, w, h, " Branches ", &lines)
+    }
+
+    fn render_conflict_overlay(
+        &self,
+        out: &mut io::Stdout,
+        w: usize,
+        h: usize,
+    ) -> Result<(), String> {
+        let mut lines: Vec<(String, &'static str)> = Vec::new();
+        let target = self.conflict_target.as_deref().unwrap_or("<none>");
+        lines.push((format!("Target: {target}"), self.theme.number));
+        lines.push((
+            "j/k move, Enter apply, Esc close".to_string(),
+            self.theme.subtle,
+        ));
+        lines.push(("".to_string(), self.theme.info));
+        let opts = [
+            "Use OURS and mark resolved",
+            "Use THEIRS and mark resolved",
+            "Mark resolved (git add)",
+            "Abort merge (git merge --abort)",
+            "Open mergetool for file",
+        ];
+        for (idx, label) in opts.iter().enumerate() {
+            let prefix = if idx == self.conflict_pick_selected {
+                ">"
+            } else {
+                " "
+            };
+            let color = if idx == self.conflict_pick_selected {
+                self.theme.ok
+            } else {
+                self.theme.info
+            };
+            lines.push((format!("{prefix} {label}"), color));
+        }
+        self.draw_center_overlay(out, w, h, " Merge Conflict Resolver ", &lines)
+    }
+
+    fn render_reset_picker_overlay(
+        &self,
+        out: &mut io::Stdout,
+        w: usize,
+        h: usize,
+    ) -> Result<(), String> {
+        let mut lines = vec![
+            (
+                format!("Mode: {}  (s soft, h hard)", if self.reset_hard { "HARD" } else { "SOFT" }),
+                if self.reset_hard { self.theme.warn } else { self.theme.ok },
+            ),
+            ("j/k select, Enter review, Esc close".to_string(), self.theme.subtle),
+            ("".to_string(), self.theme.info),
+        ];
+        append_history_rows(&mut lines, &self.history_choices, self.reset_selected, None, self.theme);
+        self.draw_center_overlay(out, w, h, " Reset Commit Selector ", &lines)
+    }
+
+    fn render_squash_picker_overlay(
+        &self,
+        out: &mut io::Stdout,
+        w: usize,
+        h: usize,
+    ) -> Result<(), String> {
+        let mut lines = vec![
+            ("Space mark commits. Mark a contiguous range ending at HEAD.".to_string(), self.theme.subtle),
+            ("Enter writes squash message. Esc closes.".to_string(), self.theme.subtle),
+            ("".to_string(), self.theme.info),
+        ];
+        append_history_rows(
+            &mut lines,
+            &self.history_choices,
+            self.reset_selected,
+            Some(&self.squash_marked),
+            self.theme,
+        );
+        self.draw_center_overlay(out, w, h, " Squash Commits ", &lines)
+    }
+
+    fn render_confirm_overlay(
+        &self,
+        out: &mut io::Stdout,
+        w: usize,
+        h: usize,
+    ) -> Result<(), String> {
+        let text = match &self.pending_action {
+            Some(PendingAction::Reset { target, hard }) => format!(
+                "{} reset to {}. {}",
+                if *hard { "Hard" } else { "Soft" },
+                &target[..target.len().min(12)],
+                if *hard { "Worktree changes will be discarded." } else { "Index and worktree stay intact." }
+            ),
+            Some(PendingAction::Squash { oldest, message }) => format!(
+                "Squash from {} into one commit: {}",
+                &oldest[..oldest.len().min(12)],
+                message
+            ),
+            None => "No pending action".to_string(),
+        };
+        self.draw_center_overlay(
+            out,
+            w,
+            h,
+            " Confirm History Rewrite ",
+            &[
+                (text, self.theme.warn),
+                ("Enter/y confirm, Esc/n cancel".to_string(), self.theme.accent),
+            ],
+        )
     }
 
     fn draw_center_overlay(
@@ -665,4 +980,25 @@ fn color_log_line(app: &App, line: &str, width: usize) -> String {
         app.theme.info
     };
     app.style.paint(color, pad_display(line, width))
+}
+
+fn append_history_rows(
+    lines: &mut Vec<(String, &'static str)>,
+    entries: &[HistoryEntry],
+    selected: usize,
+    marked: Option<&HashSet<String>>,
+    theme: Theme,
+) {
+    let max_rows = 12usize;
+    let start = selected.saturating_sub(max_rows.saturating_sub(1));
+    for (offset, entry) in entries.iter().skip(start).take(max_rows).enumerate() {
+        let idx = start + offset;
+        let marker = marked
+            .map(|set| if set.contains(&entry.hash) { "*" } else { " " })
+            .unwrap_or(" ");
+        let prefix = if idx == selected { ">" } else { " " };
+        let hash = &entry.hash[..entry.hash.len().min(10)];
+        let color = if idx == selected { theme.ok } else if marker == "*" { theme.accent } else { theme.info };
+        lines.push((format!("{prefix}{marker} {hash} {}", entry.subject), color));
+    }
 }

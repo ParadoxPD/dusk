@@ -15,7 +15,7 @@
 - Safe wrappers for `mv`, `cp`, and `ln` with overwrite guard rails and sudo retry prompt (Unix)
 - Native LOC reporting in `xtree` (`--loc`) and LOC-aware `--stats`
 - Full-color theming with terminal-capability-aware ANSI behavior (no ANSI leakage on pipes/files)
-- Git graph/status + interactive TUI with tabs, palette, overlays, staging/commit/push/branch operations
+- Git graph/status + interactive TUI with Workspace/Graph/CommitDiff/Conflicts tabs, palette, overlays, staging/commit/push/fetch/pull/branch operations and merge conflict tooling (per-file + bulk)
 - Side-by-side git diff with line numbers
 - Hex + assembly dump (`objdump`/`llvm-objdump` integration for ASM)
 - Wrapper passthrough for `find` and `rg`/`grep` with explicit binary guard errors

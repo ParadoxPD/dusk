@@ -118,12 +118,15 @@ This document outlines all `dusk` subcommands, flags, and compatibility notes.
 ### Interactive TUI
 
 - `dusk git tui` / `interactive`
-- Tabs: Workspace, Graph, CommitDiff.
+- Tabs: Workspace, Graph, CommitDiff, Conflicts.
 - Capabilities:
   - stage/unstage selected and all files
   - commit with message
-  - create/switch branches
+  - create branch and branch picker/switch
+  - fetch all remotes and pull current branch
   - push current branch and push to explicit remote/branch
+  - merge conflict resolver overlay (ours/theirs/mark/add/abort/mergetool)
+  - dedicated conflicts tab with per-file marking and bulk resolve-all actions
   - upstream branch display
   - theme cycle and theme selection via palette/commands
 - Input/navigation:

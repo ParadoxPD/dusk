@@ -48,6 +48,27 @@ impl App {
                     changed = true;
                 }
             }
+            KeyCode::Char('5') => {
+                if self.tab != Tab::Stashes {
+                    self.tab = Tab::Stashes;
+                    changed = true;
+                }
+            }
+            KeyCode::Char('6') => {
+                self.open_reset_picker()?;
+                changed = true;
+            }
+            KeyCode::Char('4') => {
+                if self.tab != Tab::Conflicts {
+                    self.open_conflicts_tab();
+                    changed = true;
+                }
+            }
+            KeyCode::Char('r') | KeyCode::Char('R') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.refresh()?;
+                self.status_msg = "Refreshed".to_string();
+                changed = true;
+            }
             KeyCode::Char('r') => {
                 self.refresh()?;
                 self.status_msg = "Refreshed".to_string();
@@ -58,7 +79,13 @@ impl App {
                 changed = true;
             }
             KeyCode::Char('D') => {
-                self.toggle_diff_mode();
+                if self.tab == Tab::Workspace {
+                    self.toggle_diff_mode();
+                }
+                changed = true;
+            }
+            KeyCode::Char('d') if self.tab == Tab::CommitDiff => {
+                self.toggle_detail_diff_mode();
                 changed = true;
             }
             KeyCode::Char('h') | KeyCode::Left if self.tab == Tab::Workspace => {
@@ -71,64 +98,72 @@ impl App {
                 self.pane = next_pane(self.pane);
                 changed = self.pane != before;
             }
+            KeyCode::Char('h') | KeyCode::Left if self.tab == Tab::CommitDiff => {
+                self.detail_pane = DetailPane::Files;
+                changed = true;
+            }
+            KeyCode::Char('l') | KeyCode::Right | KeyCode::Tab if self.tab == Tab::CommitDiff => {
+                self.detail_pane = DetailPane::Diff;
+                changed = true;
+            }
             KeyCode::Char('j') | KeyCode::Down => {
                 let before = (
                     self.selected,
                     self.log_selected,
-                    self.diff_scroll,
-                    self.commit_diff_scroll,
+                    self.workspace_diff.scroll,
+                    self.detail_diff.scroll,
                 );
                 self.move_down_active();
                 changed = (
                     self.selected,
                     self.log_selected,
-                    self.diff_scroll,
-                    self.commit_diff_scroll,
+                    self.workspace_diff.scroll,
+                    self.detail_diff.scroll,
                 ) != before;
             }
             KeyCode::Char('k') | KeyCode::Up => {
                 let before = (
                     self.selected,
                     self.log_selected,
-                    self.diff_scroll,
-                    self.commit_diff_scroll,
+                    self.workspace_diff.scroll,
+                    self.detail_diff.scroll,
                 );
                 self.move_up_active();
                 changed = (
                     self.selected,
                     self.log_selected,
-                    self.diff_scroll,
-                    self.commit_diff_scroll,
+                    self.workspace_diff.scroll,
+                    self.detail_diff.scroll,
                 ) != before;
             }
             KeyCode::Char('g') => {
                 let before = (
                     self.selected,
                     self.log_selected,
-                    self.diff_scroll,
-                    self.commit_diff_scroll,
+                    self.workspace_diff.scroll,
+                    self.detail_diff.scroll,
                 );
                 self.move_home_active();
                 changed = (
                     self.selected,
                     self.log_selected,
-                    self.diff_scroll,
-                    self.commit_diff_scroll,
+                    self.workspace_diff.scroll,
+                    self.detail_diff.scroll,
                 ) != before;
             }
             KeyCode::Char('G') => {
                 let before = (
                     self.selected,
                     self.log_selected,
-                    self.diff_scroll,
-                    self.commit_diff_scroll,
+                    self.workspace_diff.scroll,
+                    self.detail_diff.scroll,
                 );
                 self.move_end_active();
                 changed = (
                     self.selected,
                     self.log_selected,
-                    self.diff_scroll,
-                    self.commit_diff_scroll,
+                    self.workspace_diff.scroll,
+                    self.detail_diff.scroll,
                 ) != before;
             }
             KeyCode::Char('s') => {
@@ -153,7 +188,32 @@ impl App {
                 changed = true;
             }
             KeyCode::Char('p') => {
-                self.push_current_branch()?;
+                if self.tab == Tab::Stashes {
+                    self.apply_selected_stash(true)?;
+                } else {
+                    self.push_current_branch()?;
+                }
+                changed = true;
+            }
+            KeyCode::Char('a') if self.tab == Tab::Stashes => {
+                self.apply_selected_stash(false)?;
+                changed = true;
+            }
+            KeyCode::Char('z') => {
+                self.input_mode = InputMode::StashMessage;
+                self.input.clear();
+                changed = true;
+            }
+            KeyCode::Char('S') => {
+                self.open_squash_picker()?;
+                changed = true;
+            }
+            KeyCode::Char('f') => {
+                self.fetch_all()?;
+                changed = true;
+            }
+            KeyCode::Char('L') => {
+                self.pull_current_branch()?;
                 changed = true;
             }
             KeyCode::Char('R') => {
@@ -170,9 +230,53 @@ impl App {
                 self.input.clear();
                 changed = true;
             }
-            KeyCode::Char('B') => {
-                self.input_mode = InputMode::SwitchBranch;
+            KeyCode::Char('i') if self.tab == Tab::Workspace && self.pane == Pane::Files => {
+                self.add_selected_to_gitignore()?;
+                changed = true;
+            }
+            KeyCode::Char('I') if self.tab == Tab::Workspace && self.pane == Pane::Files => {
+                self.input_mode = InputMode::Gitignore;
                 self.input.clear();
+                changed = true;
+            }
+            KeyCode::Char('B') => {
+                self.open_branch_picker()?;
+                changed = true;
+            }
+            KeyCode::Char('m') => {
+                if self.tab == Tab::Conflicts {
+                    self.mark_conflicts_resolved_selected_or_marked()?;
+                } else {
+                    self.open_conflict_resolver();
+                }
+                changed = true;
+            }
+            KeyCode::Char('o') if self.tab == Tab::Conflicts => {
+                self.resolve_conflicts_ours_selected_or_marked()?;
+                changed = true;
+            }
+            KeyCode::Char('i') if self.tab == Tab::Conflicts => {
+                self.resolve_conflicts_theirs_selected_or_marked()?;
+                changed = true;
+            }
+            KeyCode::Char('O') if self.tab == Tab::Conflicts => {
+                self.resolve_conflicts_all_ours()?;
+                changed = true;
+            }
+            KeyCode::Char('I') if self.tab == Tab::Conflicts => {
+                self.resolve_conflicts_all_theirs()?;
+                changed = true;
+            }
+            KeyCode::Char('x') if self.tab == Tab::Conflicts => {
+                self.abort_merge()?;
+                changed = true;
+            }
+            KeyCode::Char('a') if self.tab == Tab::Conflicts => {
+                self.mark_all_conflicts();
+                changed = true;
+            }
+            KeyCode::Char(' ') if self.tab == Tab::Conflicts => {
+                self.toggle_mark_conflict();
                 changed = true;
             }
             KeyCode::Char(':') => {
@@ -205,6 +309,110 @@ impl App {
                     self.overlay = None;
                     self.push_overlay_lines.clear();
                     self.push_overlay_ok = None;
+                    self.action_overlay_title = "Push".to_string();
+                    changed = true;
+                }
+                _ => {}
+            },
+            Some(Overlay::BranchPicker) => match key.code {
+                KeyCode::Esc => {
+                    self.overlay = None;
+                    changed = true;
+                }
+                KeyCode::Enter => {
+                    self.run_selected_branch_pick()?;
+                    changed = true;
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    self.select_prev_branch_pick();
+                    changed = true;
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    self.select_next_branch_pick();
+                    changed = true;
+                }
+                _ => {}
+            },
+            Some(Overlay::ConflictResolver) => match key.code {
+                KeyCode::Esc => {
+                    self.overlay = None;
+                    changed = true;
+                }
+                KeyCode::Enter => {
+                    self.run_conflict_resolution_selected()?;
+                    changed = true;
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    self.select_prev_conflict_pick();
+                    changed = true;
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    self.select_next_conflict_pick();
+                    changed = true;
+                }
+                _ => {}
+            },
+            Some(Overlay::ResetPicker) => match key.code {
+                KeyCode::Esc => {
+                    self.overlay = None;
+                    changed = true;
+                }
+                KeyCode::Enter => {
+                    self.prepare_reset();
+                    changed = true;
+                }
+                KeyCode::Char('s') => {
+                    self.reset_hard = false;
+                    changed = true;
+                }
+                KeyCode::Char('h') => {
+                    self.reset_hard = true;
+                    changed = true;
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    self.select_prev_history();
+                    changed = true;
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    self.select_next_history();
+                    changed = true;
+                }
+                _ => {}
+            },
+            Some(Overlay::SquashPicker) => match key.code {
+                KeyCode::Esc => {
+                    self.overlay = None;
+                    self.squash_marked.clear();
+                    changed = true;
+                }
+                KeyCode::Char(' ') => {
+                    self.toggle_squash_mark();
+                    changed = true;
+                }
+                KeyCode::Enter => {
+                    self.overlay = None;
+                    self.input_mode = InputMode::SquashMessage;
+                    self.input.clear();
+                    changed = true;
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    self.select_prev_history();
+                    changed = true;
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    self.select_next_history();
+                    changed = true;
+                }
+                _ => {}
+            },
+            Some(Overlay::Confirm) => match key.code {
+                KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => {
+                    self.overlay = None;
+                    self.pending_action = None;
+                    changed = true;
+                }
+                KeyCode::Enter | KeyCode::Char('y') | KeyCode::Char('Y') => {
+                    self.execute_pending_action()?;
                     changed = true;
                 }
                 _ => {}
@@ -289,15 +497,6 @@ impl App {
                             self.refresh()?;
                         }
                     }
-                    InputMode::SwitchBranch => {
-                        if input.is_empty() {
-                            self.status_msg = "Branch name cannot be empty".to_string();
-                        } else {
-                            super::actions::git_status(&["switch", &input])?;
-                            self.status_msg = format!("Switched to {input}");
-                            self.refresh()?;
-                        }
-                    }
                     InputMode::PushRemote => {
                         let spec = input.trim();
                         if spec.is_empty() {
@@ -311,6 +510,15 @@ impl App {
                             self.status_msg =
                                 "Usage: <remote> <branch> or <remote>/<branch>".to_string();
                         }
+                    }
+                    InputMode::StashMessage => {
+                        self.create_stash(&input)?;
+                    }
+                    InputMode::Gitignore => {
+                        self.add_to_gitignore(&input)?;
+                    }
+                    InputMode::SquashMessage => {
+                        self.prepare_squash(&input)?;
                     }
                     InputMode::Command => {
                         let quit = self.run_command(&input)?;

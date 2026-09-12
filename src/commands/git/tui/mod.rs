@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::io;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -28,10 +29,25 @@ enum DiffMode {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
+enum DetailDiffMode {
+    Commit,
+    SelectedFile,
+    Repo,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DetailPane {
+    Files,
+    Diff,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum Tab {
     Workspace,
     Graph,
     CommitDiff,
+    Conflicts,
+    Stashes,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -39,8 +55,10 @@ enum InputMode {
     None,
     Commit,
     NewBranch,
-    SwitchBranch,
     PushRemote,
+    StashMessage,
+    Gitignore,
+    SquashMessage,
     Command,
 }
 
@@ -49,6 +67,11 @@ enum Overlay {
     Help,
     Palette,
     Push,
+    BranchPicker,
+    ConflictResolver,
+    ResetPicker,
+    SquashPicker,
+    Confirm,
 }
 
 enum KeyAction {
@@ -67,6 +90,44 @@ enum PaletteAction {
 struct PaletteEntry {
     label: String,
     action: PaletteAction,
+}
+
+#[derive(Default)]
+struct DiffView {
+    lines: Vec<String>,
+    rendered: Vec<String>,
+    render_width: usize,
+    scroll: usize,
+    view_rows: usize,
+}
+
+impl DiffView {
+    fn replace_lines(&mut self, lines: Vec<String>) {
+        self.lines = lines;
+        self.rendered.clear();
+        self.render_width = 0;
+        self.scroll = 0;
+        self.view_rows = 0;
+    }
+}
+
+#[derive(Clone)]
+struct StashEntry {
+    reference: String,
+    message: String,
+    age: String,
+}
+
+#[derive(Clone)]
+struct HistoryEntry {
+    hash: String,
+    subject: String,
+}
+
+#[derive(Clone)]
+enum PendingAction {
+    Reset { target: String, hard: bool },
+    Squash { oldest: String, message: String },
 }
 
 #[derive(Clone, Debug)]
@@ -106,6 +167,13 @@ impl FileStatus {
     fn is_tracked_change(&self) -> bool {
         !self.is_untracked() && (self.is_modified() || self.is_deleted())
     }
+
+    fn is_conflict(&self) -> bool {
+        self.x == 'U'
+            || self.y == 'U'
+            || (self.x == 'A' && self.y == 'A')
+            || (self.x == 'D' && self.y == 'D')
+    }
 }
 
 enum StatusRow {
@@ -119,6 +187,8 @@ struct App {
     style: Style,
     pane: Pane,
     diff_mode: DiffMode,
+    detail_diff_mode: DetailDiffMode,
+    detail_pane: DetailPane,
     tab: Tab,
     input_mode: InputMode,
     input: String,
@@ -134,18 +204,24 @@ struct App {
     log_commits: Vec<Option<String>>,
     log_selected: usize,
     selected_commit: Option<String>,
-    diff_lines: Vec<String>,
-    diff_rendered: Vec<String>,
-    diff_render_width: usize,
-    diff_scroll: usize,
-    diff_view_rows: usize,
-    commit_diff_lines: Vec<String>,
-    commit_diff_rendered: Vec<String>,
-    commit_diff_render_width: usize,
-    commit_diff_scroll: usize,
-    commit_diff_view_rows: usize,
+    workspace_diff: DiffView,
+    detail_diff: DiffView,
     push_overlay_lines: Vec<String>,
     push_overlay_ok: Option<bool>,
+    action_overlay_title: String,
+    branch_choices: Vec<String>,
+    branch_pick_selected: usize,
+    conflict_target: Option<String>,
+    conflict_pick_selected: usize,
+    conflict_selected: usize,
+    conflict_marked: HashSet<String>,
+    stashes: Vec<StashEntry>,
+    stash_selected: usize,
+    history_choices: Vec<HistoryEntry>,
+    reset_selected: usize,
+    reset_hard: bool,
+    squash_marked: HashSet<String>,
+    pending_action: Option<PendingAction>,
 }
 
 struct TerminalGuard;
@@ -265,7 +341,8 @@ fn blink_phase() -> bool {
 }
 
 fn is_diff_scroll_context(app: &App) -> bool {
-    (app.tab == Tab::Workspace && app.pane == Pane::Diff) || app.tab == Tab::CommitDiff
+    (app.tab == Tab::Workspace && app.pane == Pane::Diff)
+        || (app.tab == Tab::CommitDiff && app.detail_pane == DetailPane::Diff)
 }
 
 fn is_scroll_down_key(key: &crossterm::event::KeyEvent) -> bool {

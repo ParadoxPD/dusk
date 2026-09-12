@@ -29,15 +29,19 @@ Tabs:
 - `1`: Workspace
 - `2`: Graph
 - `3`: CommitDiff
+- `4`: Conflicts
 
 Features:
 
 - stage/unstage selected file
 - stage all / unstage all
 - commit with message input
-- create/switch branch
+- create branch + branch picker/switcher
 - push current branch
+- fetch all remotes (`--prune`)
+- pull current branch (`--rebase`)
 - push to explicit remote+branch target
+- merge conflict resolver overlay (ours/theirs/mark-resolved/abort/mergetool)
 - upstream branch visibility in status/header
 - command palette (`Ctrl+P`)
 - centered help overlay (`?`)
@@ -57,7 +61,19 @@ Features:
 - `s/u`: stage/unstage selected
 - `A/U`: stage-all/unstage-all
 - `c`: commit input mode
-- `b/B`: create/switch branch input mode
+- `b`: create branch input mode
+- `B`: open branch picker/switcher
+- `f`: fetch remotes (`git fetch --all --prune`)
+- `L`: pull current branch (`git pull --rebase`)
+- `m`: open merge conflict resolver for selected conflicted file
+- `4`: open Conflicts tab
+- Conflicts tab:
+  - `Space`: mark/unmark file
+  - `a`: mark-all / clear-all
+  - `o/i`: resolve selected/marked with ours/theirs
+  - `O/I`: resolve all conflicts with ours/theirs
+  - `m`: mark selected/marked resolved (`git add`)
+  - `x`: abort merge
 - `p`: push current branch
 - `R`: push to remote branch input mode
 - `t`: cycle theme
@@ -74,10 +90,19 @@ Features:
 - `stage-all`, `unstage-all`
 - `commit <msg>`
 - `push`
+- `fetch`
+- `pull`
 - `push-remote <remote>/<branch>`
 - `push-remote <remote> <branch>`
-- `branch <name>`
-- `switch <name>`
+- `branch <name>` (or `branch` to open picker)
+- `branches`, `branch-picker`
+- `switch <name>` (or `switch` to open picker)
+- `resolve-conflict`, `resolve`
+- `conflicts`, `conflict-tab`, `conflicts-tab`
+- `resolve-all-ours`, `resolve-all-theirs`
+- `resolve-marked-ours`, `resolve-marked-theirs`
+- `mark-resolved`
+- `abort-merge`
 - `workspace`
 - `graph-tab`, `graphview`
 - `commitdiff`, `commit-diff`
