@@ -43,8 +43,8 @@ impl App {
                 }
             }
             KeyCode::Char('3') => {
-                if self.tab != Tab::CommitDiff {
-                    self.tab = Tab::CommitDiff;
+                if self.tab != Tab::DiffViewer {
+                    self.tab = Tab::DiffViewer;
                     changed = true;
                 }
             }
@@ -64,7 +64,9 @@ impl App {
                     changed = true;
                 }
             }
-            KeyCode::Char('r') | KeyCode::Char('R') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            KeyCode::Char('r') | KeyCode::Char('R')
+                if key.modifiers.contains(KeyModifiers::CONTROL) =>
+            {
                 self.refresh()?;
                 self.status_msg = "Refreshed".to_string();
                 changed = true;
@@ -84,7 +86,7 @@ impl App {
                 }
                 changed = true;
             }
-            KeyCode::Char('d') if self.tab == Tab::CommitDiff => {
+            KeyCode::Char('d') if self.tab == Tab::DiffViewer => {
                 self.toggle_detail_diff_mode();
                 changed = true;
             }
@@ -98,11 +100,11 @@ impl App {
                 self.pane = next_pane(self.pane);
                 changed = self.pane != before;
             }
-            KeyCode::Char('h') | KeyCode::Left if self.tab == Tab::CommitDiff => {
+            KeyCode::Char('h') | KeyCode::Left if self.tab == Tab::DiffViewer => {
                 self.detail_pane = DetailPane::Files;
                 changed = true;
             }
-            KeyCode::Char('l') | KeyCode::Right | KeyCode::Tab if self.tab == Tab::CommitDiff => {
+            KeyCode::Char('l') | KeyCode::Right | KeyCode::Tab if self.tab == Tab::DiffViewer => {
                 self.detail_pane = DetailPane::Diff;
                 changed = true;
             }

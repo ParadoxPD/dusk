@@ -1,7 +1,11 @@
 use std::ffi::OsString;
+use std::fs;
 use std::io;
 use std::path::PathBuf;
 use std::process::{Command, ExitStatus, Stdio};
+
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 
 pub fn run_passthrough(bin: &str, args: &[OsString]) -> io::Result<ExitStatus> {
     Command::new(bin)
@@ -55,7 +59,7 @@ fn find_command_path(bin: &str) -> Option<PathBuf> {
 
     for dir in paths {
         let cand = dir.join(bin);
-        if cand.is_file() {
+        if is_executable_file(&cand) {
             return Some(cand);
         }
 
@@ -63,11 +67,24 @@ fn find_command_path(bin: &str) -> Option<PathBuf> {
         {
             for ext in &exts {
                 let c = dir.join(format!("{bin}{ext}"));
-                if c.is_file() {
+                if is_executable_file(&c) {
                     return Some(c);
                 }
             }
         }
     }
     None
+}
+
+#[cfg(unix)]
+fn is_executable_file(path: &std::path::Path) -> bool {
+    path.is_file()
+        && fs::metadata(path)
+            .map(|metadata| metadata.permissions().mode() & 0o111 != 0)
+            .unwrap_or(false)
+}
+
+#[cfg(not(unix))]
+fn is_executable_file(path: &std::path::Path) -> bool {
+    path.is_file()
 }

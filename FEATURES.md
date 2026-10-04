@@ -118,7 +118,7 @@ This document outlines all `dusk` subcommands, flags, and compatibility notes.
 ### Interactive TUI
 
 - `dusk git tui` / `interactive`
-- Tabs: Workspace, Graph, CommitDiff, Conflicts.
+- Tabs: Workspace, Graph, DiffViewer, Conflicts, Stashes.
 - Capabilities:
   - stage/unstage selected and all files
   - commit with message
@@ -127,6 +127,12 @@ This document outlines all `dusk` subcommands, flags, and compatibility notes.
   - push current branch and push to explicit remote/branch
   - merge conflict resolver overlay (ours/theirs/mark/add/abort/mergetool)
   - dedicated conflicts tab with per-file marking and bulk resolve-all actions
+  - shared side-by-side diff viewport for workspace, commit, repository, and file diffs
+  - compact changed-file selector inside file diff mode
+  - stash creation, stash list, apply, and pop
+  - squash selector with commit message and confirmation
+  - soft/hard reset commit selector with confirmation
+  - hotkey refresh and safe `.gitignore` insertion
   - upstream branch display
   - theme cycle and theme selection via palette/commands
 - Input/navigation:
@@ -197,6 +203,7 @@ Default theme: `onedark-pro`
 
 - [`docs/README.md`](docs/README.md)
 - [`docs/help.md`](docs/help.md)
+- [`docs/performance-security.md`](docs/performance-security.md)
 - [`docs/xtree.md`](docs/xtree.md)
 - [`docs/ls.md`](docs/ls.md)
 - [`docs/cat-bat.md`](docs/cat-bat.md)

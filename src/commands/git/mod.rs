@@ -56,7 +56,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
         println!(
             "  {}",
             desc(
-                "1/2/3/4 tabs  j/k move  h/l pane  s/u stage/unstage  A/U all  c commit  p push current  f fetch  L pull  R push-remote  b create branch  B branch picker/switch  m conflict resolver  t cycle theme  Ctrl+P palette  : command (use :cmdhelp)  ? help  q quit"
+                "1/2/3/4/5 tabs  j/k move  h/l pane  r refresh  s/u stage/unstage  c commit  p push  f fetch  L pull  z stash  S squash  6 reset  i ignore  B branches  m conflict resolver  : command (use :cmdhelp)  ? help  q quit"
             )
         );
         return Ok(());

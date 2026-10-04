@@ -15,7 +15,7 @@
 - Safe wrappers for `mv`, `cp`, and `ln` with overwrite guard rails and sudo retry prompt (Unix)
 - Native LOC reporting in `xtree` (`--loc`) and LOC-aware `--stats`
 - Full-color theming with terminal-capability-aware ANSI behavior (no ANSI leakage on pipes/files)
-- Git graph/status + interactive TUI with Workspace/Graph/CommitDiff/Conflicts tabs, palette, overlays, staging/commit/push/fetch/pull/branch operations and merge conflict tooling (per-file + bulk)
+- Git graph/status + interactive TUI with Workspace/Graph/DiffViewer/Conflicts/Stashes tabs, shared diff rendering, staging/commit/push/fetch/pull/branch/stash/history operations, and merge conflict tooling
 - Side-by-side git diff with line numbers
 - Hex + assembly dump (`objdump`/`llvm-objdump` integration for ASM)
 - Wrapper passthrough for `find` and `rg`/`grep` with explicit binary guard errors
@@ -64,6 +64,7 @@ dusk grep [args...]
 - Command docs index: [`docs/README.md`](docs/README.md)
 - Per-command docs:
   - [`docs/help.md`](docs/help.md)
+  - [`docs/performance-security.md`](docs/performance-security.md)
   - [`docs/xtree.md`](docs/xtree.md)
   - [`docs/ls.md`](docs/ls.md)
   - [`docs/cat-bat.md`](docs/cat-bat.md)

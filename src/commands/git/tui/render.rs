@@ -56,15 +56,6 @@ impl App {
         (view.scroll, rows)
     }
 
-    fn commit_diff_header(&self, width: usize) -> String {
-        let sha = self
-            .selected_commit
-            .as_deref()
-            .map(|s| s.chars().take(12).collect::<String>())
-            .unwrap_or_else(|| "none".to_string());
-        self.color_cell(&format!(" COMMIT DIFF ({sha}) "), width, self.theme.ok)
-    }
-
     pub(super) fn render(&mut self, cursor_on: bool) -> Result<(), String> {
         let mut out = io::stdout();
         let (w, h) = crossterm::terminal::size().map_err(|e| e.to_string())?;
@@ -183,7 +174,7 @@ impl App {
                     draw_line(&mut out, (row + 3) as u16, &line)?;
                 }
             }
-            Tab::CommitDiff => {
+            Tab::DiffViewer => {
                 self.render_detail_diff_tab(&mut out, w, body_h)?;
             }
             Tab::Conflicts => {
@@ -236,7 +227,7 @@ impl App {
             "{}  {}  {}  {}  {}    {}",
             tab("1 Workspace", self.tab == Tab::Workspace),
             tab("2 Graph", self.tab == Tab::Graph),
-            tab("3 CommitDiff", self.tab == Tab::CommitDiff),
+            tab("3 DiffViewer", self.tab == Tab::DiffViewer),
             tab("4 Conflicts", self.tab == Tab::Conflicts),
             tab("5 Stashes", self.tab == Tab::Stashes),
             self.style.paint(
@@ -369,16 +360,16 @@ impl App {
         height: usize,
     ) -> Result<(), String> {
         let label = match self.detail_diff_mode {
-            DetailDiffMode::Commit => self
+            DiffViewerMode::Commit => self
                 .selected_commit
                 .as_deref()
                 .map(|sha| format!(" COMMIT DIFF ({})  d: mode ", &sha[..sha.len().min(12)]))
                 .unwrap_or_else(|| " COMMIT DIFF (none)  d: mode ".to_string()),
-            DetailDiffMode::Repo => " REPOSITORY DIFF  d: mode ".to_string(),
-            DetailDiffMode::SelectedFile => " FILE DIFF  d: mode, h/l: files/diff ".to_string(),
+            DiffViewerMode::Repo => " REPOSITORY DIFF  d: mode ".to_string(),
+            DiffViewerMode::SelectedFile => " FILE DIFF  d: mode, h/l: files/diff ".to_string(),
         };
 
-        if self.detail_diff_mode != DetailDiffMode::SelectedFile || width < 88 {
+        if self.detail_diff_mode != DiffViewerMode::SelectedFile || width < 88 {
             let header = self.color_cell(&label, width, self.theme.ok);
             draw_line(out, 3, &header)?;
             let (start, rows) = self.diff_window(true, width, height);
@@ -431,13 +422,20 @@ impl App {
         lines.push(self.color_cell(
             " CHANGED FILES ",
             width,
-            if active { self.theme.ok } else { self.theme.accent },
+            if active {
+                self.theme.ok
+            } else {
+                self.theme.accent
+            },
         ));
         let order = self.file_selection_order();
         if order.is_empty() {
             lines.push(self.color_cell(" clean ", width, self.theme.info));
         } else {
-            let selected_pos = order.iter().position(|idx| *idx == self.selected).unwrap_or(0);
+            let selected_pos = order
+                .iter()
+                .position(|idx| *idx == self.selected)
+                .unwrap_or(0);
             let start = selected_pos.saturating_sub(height.saturating_sub(2));
             for idx in order.iter().skip(start).take(height.saturating_sub(1)) {
                 let file = &self.files[*idx];
@@ -535,8 +533,15 @@ impl App {
             let start = self.stash_selected.saturating_sub(rows.saturating_sub(1));
             for (offset, stash) in self.stashes.iter().skip(start).take(rows).enumerate() {
                 let idx = start + offset;
-                let text = format!("{:<10} {:<14} {}", stash.reference, stash.age, stash.message);
-                let color = if idx == self.stash_selected { "\x1b[1;97;44m" } else { self.theme.info };
+                let text = format!(
+                    "{:<10} {:<14} {}",
+                    stash.reference, stash.age, stash.message
+                );
+                let color = if idx == self.stash_selected {
+                    "\x1b[1;97;44m"
+                } else {
+                    self.theme.info
+                };
                 lines.push(self.color_cell(&text, width, color));
             }
         }
@@ -554,7 +559,7 @@ impl App {
                 self.theme.info,
             ),
             (
-                "1 Workspace, 2 Graph, 3 DetailDiff, 4 Conflicts, 5 Stashes".to_string(),
+                "1 Workspace, 2 Graph, 3 DiffViewer, 4 Conflicts, 5 Stashes".to_string(),
                 self.theme.info,
             ),
             (
@@ -573,7 +578,12 @@ impl App {
                 self.theme.info,
             ),
             (
-                "b create branch, B branch picker, m conflict resolver, D toggle repo/file diff"
+                "b create branch, B branch picker, d diff viewer mode, m conflict resolver"
+                    .to_string(),
+                self.theme.info,
+            ),
+            (
+                "z stash, S squash, 6 reset, i/I add changed path or entry to .gitignore"
                     .to_string(),
                 self.theme.info,
             ),
@@ -589,7 +599,7 @@ impl App {
                 self.theme.info,
             ),
             (
-                ":workspace :graph-tab :commitdiff :file-diff :repo-diff".to_string(),
+                ":workspace :graph-tab :diffviewer :file-diff :repo-diff".to_string(),
                 self.theme.info,
             ),
             (
@@ -806,13 +816,29 @@ impl App {
     ) -> Result<(), String> {
         let mut lines = vec![
             (
-                format!("Mode: {}  (s soft, h hard)", if self.reset_hard { "HARD" } else { "SOFT" }),
-                if self.reset_hard { self.theme.warn } else { self.theme.ok },
+                format!(
+                    "Mode: {}  (s soft, h hard)",
+                    if self.reset_hard { "HARD" } else { "SOFT" }
+                ),
+                if self.reset_hard {
+                    self.theme.warn
+                } else {
+                    self.theme.ok
+                },
             ),
-            ("j/k select, Enter review, Esc close".to_string(), self.theme.subtle),
+            (
+                "j/k select, Enter review, Esc close".to_string(),
+                self.theme.subtle,
+            ),
             ("".to_string(), self.theme.info),
         ];
-        append_history_rows(&mut lines, &self.history_choices, self.reset_selected, None, self.theme);
+        append_history_rows(
+            &mut lines,
+            &self.history_choices,
+            self.reset_selected,
+            None,
+            self.theme,
+        );
         self.draw_center_overlay(out, w, h, " Reset Commit Selector ", &lines)
     }
 
@@ -823,8 +849,14 @@ impl App {
         h: usize,
     ) -> Result<(), String> {
         let mut lines = vec![
-            ("Space mark commits. Mark a contiguous range ending at HEAD.".to_string(), self.theme.subtle),
-            ("Enter writes squash message. Esc closes.".to_string(), self.theme.subtle),
+            (
+                "Space mark commits. Mark a contiguous range ending at HEAD.".to_string(),
+                self.theme.subtle,
+            ),
+            (
+                "Enter writes squash message. Esc closes.".to_string(),
+                self.theme.subtle,
+            ),
             ("".to_string(), self.theme.info),
         ];
         append_history_rows(
@@ -848,7 +880,11 @@ impl App {
                 "{} reset to {}. {}",
                 if *hard { "Hard" } else { "Soft" },
                 &target[..target.len().min(12)],
-                if *hard { "Worktree changes will be discarded." } else { "Index and worktree stay intact." }
+                if *hard {
+                    "Worktree changes will be discarded."
+                } else {
+                    "Index and worktree stay intact."
+                }
             ),
             Some(PendingAction::Squash { oldest, message }) => format!(
                 "Squash from {} into one commit: {}",
@@ -864,7 +900,10 @@ impl App {
             " Confirm History Rewrite ",
             &[
                 (text, self.theme.warn),
-                ("Enter/y confirm, Esc/n cancel".to_string(), self.theme.accent),
+                (
+                    "Enter/y confirm, Esc/n cancel".to_string(),
+                    self.theme.accent,
+                ),
             ],
         )
     }
@@ -998,7 +1037,13 @@ fn append_history_rows(
             .unwrap_or(" ");
         let prefix = if idx == selected { ">" } else { " " };
         let hash = &entry.hash[..entry.hash.len().min(10)];
-        let color = if idx == selected { theme.ok } else if marker == "*" { theme.accent } else { theme.info };
+        let color = if idx == selected {
+            theme.ok
+        } else if marker == "*" {
+            theme.accent
+        } else {
+            theme.info
+        };
         lines.push((format!("{prefix}{marker} {hash} {}", entry.subject), color));
     }
 }

@@ -28,8 +28,9 @@ Tabs:
 
 - `1`: Workspace
 - `2`: Graph
-- `3`: CommitDiff
+- `3`: DiffViewer
 - `4`: Conflicts
+- `5`: Stashes
 
 Features:
 
@@ -66,6 +67,16 @@ Features:
 - `f`: fetch remotes (`git fetch --all --prune`)
 - `L`: pull current branch (`git pull --rebase`)
 - `m`: open merge conflict resolver for selected conflicted file
+- `d` in DiffViewer: cycle commit/repository/file diff
+- DiffViewer file mode: `h/l` switch compact changed-file selector and diff; `j/k` select files or scroll diff
+- `z`: create stash with message input
+- `a` in Stashes: apply selected stash
+- `p` in Stashes: pop selected stash
+- `S`: open squash selector
+- `6`: open reset selector
+- `i`: add selected changed path to `.gitignore`
+- `I`: enter a repository-relative `.gitignore` entry
+- `r` or `Ctrl+R`: refresh repository state
 - `4`: open Conflicts tab
 - Conflicts tab:
   - `Space`: mark/unmark file
@@ -103,9 +114,15 @@ Features:
 - `resolve-marked-ours`, `resolve-marked-theirs`
 - `mark-resolved`
 - `abort-merge`
+- `stash [message]`
+- `stashes`, `stash-tab`
+- `stash-apply`, `stash-pop`
+- `squash`
+- `reset`
+- `ignore [path]`
 - `workspace`
 - `graph-tab`, `graphview`
-- `commitdiff`, `commit-diff`
+- `diffviewer`, `diff-viewer` (canonical; `commitdiff` and `commit-diff` remain aliases)
 - `theme <name>`
 - `themes`
 - `palette`

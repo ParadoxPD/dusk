@@ -29,7 +29,7 @@ enum DiffMode {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum DetailDiffMode {
+enum DiffViewerMode {
     Commit,
     SelectedFile,
     Repo,
@@ -45,7 +45,7 @@ enum DetailPane {
 enum Tab {
     Workspace,
     Graph,
-    CommitDiff,
+    DiffViewer,
     Conflicts,
     Stashes,
 }
@@ -187,7 +187,7 @@ struct App {
     style: Style,
     pane: Pane,
     diff_mode: DiffMode,
-    detail_diff_mode: DetailDiffMode,
+    detail_diff_mode: DiffViewerMode,
     detail_pane: DetailPane,
     tab: Tab,
     input_mode: InputMode,
@@ -342,7 +342,7 @@ fn blink_phase() -> bool {
 
 fn is_diff_scroll_context(app: &App) -> bool {
     (app.tab == Tab::Workspace && app.pane == Pane::Diff)
-        || (app.tab == Tab::CommitDiff && app.detail_pane == DetailPane::Diff)
+        || (app.tab == Tab::DiffViewer && app.detail_pane == DetailPane::Diff)
 }
 
 fn is_scroll_down_key(key: &crossterm::event::KeyEvent) -> bool {
