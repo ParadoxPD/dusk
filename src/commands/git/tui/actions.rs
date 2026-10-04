@@ -17,7 +17,7 @@ impl App {
             style,
             pane: Pane::Files,
             diff_mode: DiffMode::SelectedFile,
-            detail_diff_mode: DetailDiffMode::Commit,
+            detail_diff_mode: DiffViewerMode::Commit,
             detail_pane: DetailPane::Diff,
             tab: Tab::Workspace,
             input_mode: InputMode::None,
@@ -60,7 +60,10 @@ impl App {
     }
 
     pub(super) fn refresh(&mut self) -> Result<(), String> {
-        let selected_path = self.files.get(self.selected).map(|file| file.git_path.clone());
+        let selected_path = self
+            .files
+            .get(self.selected)
+            .map(|file| file.git_path.clone());
         self.branch = git_capture(&["branch", "--show-current"])?
             .trim()
             .to_string();
@@ -150,13 +153,22 @@ impl App {
             self.status_msg = "No stash selected".to_string();
             return Ok(());
         };
-        git_status(&[if pop { "stash" } else { "stash" }, if pop { "pop" } else { "apply" }, &stash.reference])?;
-        self.status_msg = format!("{} {}", if pop { "Restored" } else { "Applied" }, stash.reference);
+        let action = if pop { "pop" } else { "apply" };
+        git_status(&["stash", action, &stash.reference])?;
+        self.status_msg = format!(
+            "{} {}",
+            if pop { "Restored" } else { "Applied" },
+            stash.reference
+        );
         self.refresh()
     }
 
     pub(super) fn add_selected_to_gitignore(&mut self) -> Result<(), String> {
-        let Some(path) = self.files.get(self.selected).map(|file| file.git_path.clone()) else {
+        let Some(path) = self
+            .files
+            .get(self.selected)
+            .map(|file| file.git_path.clone())
+        else {
             self.status_msg = "No changed file selected".to_string();
             return Ok(());
         };
@@ -167,6 +179,15 @@ impl App {
         let entry = normalize_gitignore_entry(raw)?;
         let root = git_capture(&["rev-parse", "--show-toplevel"])?;
         let gitignore = PathBuf::from(root.trim()).join(".gitignore");
+        if fs::symlink_metadata(&gitignore)
+            .map(|metadata| metadata.file_type().is_symlink())
+            .unwrap_or(false)
+        {
+            return Err(format!(
+                "refusing to write .gitignore through symlink: {}",
+                gitignore.display()
+            ));
+        }
         let existing = fs::read_to_string(&gitignore).unwrap_or_default();
         if existing.lines().map(str::trim).any(|line| line == entry) {
             self.status_msg = format!("Already ignored: {entry}");
@@ -266,7 +287,8 @@ impl App {
             return Ok(());
         };
         if newest_idx != 0 || marked.len() != oldest_idx + 1 {
-            self.status_msg = "Squash selection must be a contiguous range ending at HEAD".to_string();
+            self.status_msg =
+                "Squash selection must be a contiguous range ending at HEAD".to_string();
             return Ok(());
         }
         let oldest = self.history_choices[oldest_idx].hash.clone();
@@ -287,7 +309,11 @@ impl App {
         match action {
             PendingAction::Reset { target, hard } => {
                 git_status(&["reset", if hard { "--hard" } else { "--soft" }, &target])?;
-                self.status_msg = format!("{} reset to {}", if hard { "Hard" } else { "Soft" }, short_hash(&target));
+                self.status_msg = format!(
+                    "{} reset to {}",
+                    if hard { "Hard" } else { "Soft" },
+                    short_hash(&target)
+                );
             }
             PendingAction::Squash { oldest, message } => {
                 let parent = format!("{oldest}^");
@@ -355,27 +381,27 @@ impl App {
 
     pub(super) fn toggle_detail_diff_mode(&mut self) {
         self.detail_diff_mode = match self.detail_diff_mode {
-            DetailDiffMode::Commit => DetailDiffMode::Repo,
-            DetailDiffMode::Repo => DetailDiffMode::SelectedFile,
-            DetailDiffMode::SelectedFile => DetailDiffMode::Commit,
+            DiffViewerMode::Commit => DiffViewerMode::Repo,
+            DiffViewerMode::Repo => DiffViewerMode::SelectedFile,
+            DiffViewerMode::SelectedFile => DiffViewerMode::Commit,
         };
-        self.detail_pane = if self.detail_diff_mode == DetailDiffMode::SelectedFile {
+        self.detail_pane = if self.detail_diff_mode == DiffViewerMode::SelectedFile {
             DetailPane::Files
         } else {
             DetailPane::Diff
         };
         self.refresh_detail_diff();
         self.status_msg = match self.detail_diff_mode {
-            DetailDiffMode::Commit => "Detail diff: selected commit".to_string(),
-            DetailDiffMode::Repo => "Detail diff: repository".to_string(),
-            DetailDiffMode::SelectedFile => "Detail diff: selected file".to_string(),
+            DiffViewerMode::Commit => "Diff viewer: selected commit".to_string(),
+            DiffViewerMode::Repo => "Diff viewer: repository".to_string(),
+            DiffViewerMode::SelectedFile => "Diff viewer: selected file".to_string(),
         };
     }
 
     pub(super) fn refresh_detail_diff(&mut self) {
         self.selected_commit = None;
         match self.detail_diff_mode {
-            DetailDiffMode::SelectedFile => {
+            DiffViewerMode::SelectedFile => {
                 if self.files.is_empty() {
                     self.detail_diff
                         .replace_lines(vec!["Working tree clean.".to_string()]);
@@ -395,7 +421,7 @@ impl App {
                 });
                 return;
             }
-            DetailDiffMode::Repo => {
+            DiffViewerMode::Repo => {
                 let output = git_capture(&["diff", "--no-color", "--unified=3"])
                     .unwrap_or_else(|e| format!("diff error: {e}"));
                 self.detail_diff.replace_lines(if output.trim().is_empty() {
@@ -405,11 +431,12 @@ impl App {
                 });
                 return;
             }
-            DetailDiffMode::Commit => {}
+            DiffViewerMode::Commit => {}
         }
 
         if self.log_lines.is_empty() {
-            self.detail_diff.replace_lines(vec!["No commits found.".to_string()]);
+            self.detail_diff
+                .replace_lines(vec!["No commits found.".to_string()]);
             return;
         }
 
@@ -441,7 +468,7 @@ impl App {
         self.selected_commit = Some(hash.clone());
 
         let output = git_capture(&["show", "--stat", "--patch", "--color=never", &hash])
-            .unwrap_or_else(|e| format!("commit diff error: {e}"));
+            .unwrap_or_else(|e| format!("diff viewer error: {e}"));
         if output.trim().is_empty() {
             self.detail_diff
                 .replace_lines(vec![format!("No diff output for commit {hash}")]);
@@ -459,8 +486,10 @@ impl App {
                 Pane::Diff => self.workspace_diff.scroll = 0,
             },
             Tab::Graph => self.log_selected = 0,
-            Tab::CommitDiff => match self.detail_pane {
-                DetailPane::Files => self.selected = self.file_selection_order().first().copied().unwrap_or(0),
+            Tab::DiffViewer => match self.detail_pane {
+                DetailPane::Files => {
+                    self.selected = self.file_selection_order().first().copied().unwrap_or(0)
+                }
                 DetailPane::Diff => self.detail_diff.scroll = 0,
             },
             Tab::Conflicts => self.conflict_selected = 0,
@@ -471,13 +500,17 @@ impl App {
     pub(super) fn move_end_active(&mut self) {
         match self.tab {
             Tab::Workspace => match self.pane {
-                Pane::Files => self.selected = self.file_selection_order().last().copied().unwrap_or(0),
+                Pane::Files => {
+                    self.selected = self.file_selection_order().last().copied().unwrap_or(0)
+                }
                 Pane::Log => self.log_selected = self.log_lines.len().saturating_sub(1),
                 Pane::Diff => self.workspace_diff.scroll = self.workspace_diff_max_scroll(),
             },
             Tab::Graph => self.log_selected = self.log_lines.len().saturating_sub(1),
-            Tab::CommitDiff => match self.detail_pane {
-                DetailPane::Files => self.selected = self.file_selection_order().last().copied().unwrap_or(0),
+            Tab::DiffViewer => match self.detail_pane {
+                DetailPane::Files => {
+                    self.selected = self.file_selection_order().last().copied().unwrap_or(0)
+                }
                 DetailPane::Diff => self.detail_diff.scroll = self.detail_diff_max_scroll(),
             },
             Tab::Conflicts => {
@@ -491,23 +524,30 @@ impl App {
         match self.tab {
             Tab::Workspace => match self.pane {
                 Pane::Files => self.move_up(),
-                Pane::Log => self.log_selected = prev_index(self.log_selected, self.log_lines.len()),
-                Pane::Diff => self.workspace_diff.scroll = self.workspace_diff.scroll.saturating_sub(1),
+                Pane::Log => {
+                    self.log_selected = prev_index(self.log_selected, self.log_lines.len())
+                }
+                Pane::Diff => {
+                    self.workspace_diff.scroll = self.workspace_diff.scroll.saturating_sub(1)
+                }
             },
             Tab::Graph => {
                 self.log_selected = prev_index(self.log_selected, self.log_lines.len());
                 self.refresh_detail_diff();
             }
-            Tab::CommitDiff => {
-                match self.detail_pane {
-                    DetailPane::Files => self.move_up(),
-                    DetailPane::Diff => self.detail_diff.scroll = self.detail_diff.scroll.saturating_sub(1),
+            Tab::DiffViewer => match self.detail_pane {
+                DetailPane::Files => self.move_up(),
+                DetailPane::Diff => {
+                    self.detail_diff.scroll = self.detail_diff.scroll.saturating_sub(1)
                 }
-            }
+            },
             Tab::Conflicts => {
-                self.conflict_selected = prev_index(self.conflict_selected, self.conflict_paths().len());
+                self.conflict_selected =
+                    prev_index(self.conflict_selected, self.conflict_paths().len());
             }
-            Tab::Stashes => self.stash_selected = prev_index(self.stash_selected, self.stashes.len()),
+            Tab::Stashes => {
+                self.stash_selected = prev_index(self.stash_selected, self.stashes.len())
+            }
         }
     }
 
@@ -515,7 +555,9 @@ impl App {
         match self.tab {
             Tab::Workspace => match self.pane {
                 Pane::Files => self.move_down(),
-                Pane::Log => self.log_selected = next_index(self.log_selected, self.log_lines.len()),
+                Pane::Log => {
+                    self.log_selected = next_index(self.log_selected, self.log_lines.len())
+                }
                 Pane::Diff => {
                     self.workspace_diff.scroll = cmp::min(
                         self.workspace_diff.scroll + 1,
@@ -527,21 +569,20 @@ impl App {
                 self.log_selected = next_index(self.log_selected, self.log_lines.len());
                 self.refresh_detail_diff();
             }
-            Tab::CommitDiff => {
-                match self.detail_pane {
-                    DetailPane::Files => self.move_down(),
-                    DetailPane::Diff => {
-                        self.detail_diff.scroll = cmp::min(
-                            self.detail_diff.scroll + 1,
-                            self.detail_diff_max_scroll(),
-                        );
-                    }
+            Tab::DiffViewer => match self.detail_pane {
+                DetailPane::Files => self.move_down(),
+                DetailPane::Diff => {
+                    self.detail_diff.scroll =
+                        cmp::min(self.detail_diff.scroll + 1, self.detail_diff_max_scroll());
                 }
-            }
+            },
             Tab::Conflicts => {
-                self.conflict_selected = next_index(self.conflict_selected, self.conflict_paths().len());
+                self.conflict_selected =
+                    next_index(self.conflict_selected, self.conflict_paths().len());
             }
-            Tab::Stashes => self.stash_selected = next_index(self.stash_selected, self.stashes.len()),
+            Tab::Stashes => {
+                self.stash_selected = next_index(self.stash_selected, self.stashes.len())
+            }
         }
     }
 
@@ -551,7 +592,10 @@ impl App {
             return;
         }
         let before = self.selected;
-        let at = order.iter().position(|idx| *idx == self.selected).unwrap_or(0);
+        let at = order
+            .iter()
+            .position(|idx| *idx == self.selected)
+            .unwrap_or(0);
         self.selected = order[prev_index(at, order.len())];
         if self.selected != before {
             self.refresh_diff();
@@ -565,7 +609,10 @@ impl App {
             return;
         }
         let before = self.selected;
-        let at = order.iter().position(|idx| *idx == self.selected).unwrap_or(0);
+        let at = order
+            .iter()
+            .position(|idx| *idx == self.selected)
+            .unwrap_or(0);
         self.selected = order[next_index(at, order.len())];
         if self.selected != before {
             self.refresh_diff();
@@ -1208,9 +1255,9 @@ impl App {
                 self.tab = Tab::Graph;
                 self.status_msg = "Switched to Graph tab".to_string();
             }
-            "commitdiff" | "commit-diff" => {
-                self.tab = Tab::CommitDiff;
-                self.status_msg = "Switched to CommitDiff tab".to_string();
+            "diffviewer" | "diff-viewer" | "commitdiff" | "commit-diff" => {
+                self.tab = Tab::DiffViewer;
+                self.status_msg = "Switched to DiffViewer tab".to_string();
             }
             "conflicts-tab" => {
                 self.open_conflicts_tab();
@@ -1341,8 +1388,8 @@ impl App {
                 action: PaletteAction::Command("graph-tab"),
             },
             PaletteEntry {
-                label: "Open CommitDiff Tab".to_string(),
-                action: PaletteAction::Command("commitdiff"),
+                label: "Open DiffViewer Tab".to_string(),
+                action: PaletteAction::Command("diffviewer"),
             },
             PaletteEntry {
                 label: "Open Conflicts Tab".to_string(),
@@ -1559,15 +1606,13 @@ impl App {
                         .saturating_add(delta as usize)
                         .min(max);
                 } else {
-                    self.workspace_diff.scroll = self
-                        .workspace_diff
-                        .scroll
-                        .saturating_sub((-delta) as usize);
+                    self.workspace_diff.scroll =
+                        self.workspace_diff.scroll.saturating_sub((-delta) as usize);
                 }
                 self.workspace_diff.scroll != before
             }
             Tab::Graph => false,
-            Tab::CommitDiff => {
+            Tab::DiffViewer => {
                 let before = self.detail_diff.scroll;
                 if delta > 0 {
                     let max = self.detail_diff_max_scroll();
@@ -1577,7 +1622,8 @@ impl App {
                         .saturating_add(delta as usize)
                         .min(max);
                 } else {
-                    self.detail_diff.scroll = self.detail_diff.scroll.saturating_sub((-delta) as usize);
+                    self.detail_diff.scroll =
+                        self.detail_diff.scroll.saturating_sub((-delta) as usize);
                 }
                 self.detail_diff.scroll != before
             }
@@ -1623,7 +1669,13 @@ fn next_index(current: usize, len: usize) -> usize {
 }
 
 fn prev_index(current: usize, len: usize) -> usize {
-    if len == 0 { 0 } else if current == 0 { len - 1 } else { current - 1 }
+    if len == 0 {
+        0
+    } else if current == 0 {
+        len - 1
+    } else {
+        current - 1
+    }
 }
 
 fn short_hash(hash: &str) -> &str {
@@ -1652,7 +1704,7 @@ pub(super) fn parse_commit_hash(line: &str) -> Option<String> {
 }
 
 pub(super) fn command_mode_help() -> String {
-    "Cmds: help|cmdhelp|refresh|stage|unstage|stage-all|unstage-all|commit <msg>|push|fetch|pull|push-remote <remote>/<branch>|branch [name]|branches|switch [name]|resolve-conflict|conflicts|resolve-all-ours|resolve-all-theirs|resolve-marked-ours|resolve-marked-theirs|mark-resolved|abort-merge|workspace|graph-tab|commitdiff|conflicts-tab|diff|file-diff|repo-diff|toggle-diff|theme <name>|themes|palette|quit".to_string()
+    "Cmds: help|cmdhelp|refresh|stage|unstage|stage-all|unstage-all|commit <msg>|push|fetch|pull|stash [message]|stashes|stash-apply|stash-pop|squash|reset|ignore [path]|push-remote <remote>/<branch>|branch [name]|branches|switch [name]|resolve-conflict|conflicts|resolve-all-ours|resolve-all-theirs|resolve-marked-ours|resolve-marked-theirs|mark-resolved|abort-merge|workspace|graph-tab|diffviewer|file-diff|repo-diff|toggle-diff|theme <name>|themes|palette|quit (aliases: commitdiff, commit-diff)".to_string()
 }
 
 fn parse_porcelain(s: &str) -> Vec<FileStatus> {
@@ -1707,5 +1759,32 @@ pub(super) fn git_status(args: &[&str]) -> Result<(), String> {
         Ok(())
     } else {
         Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{next_index, normalize_gitignore_entry, prev_index};
+
+    #[test]
+    fn selection_indices_wrap_in_both_directions() {
+        assert_eq!(next_index(2, 3), 0);
+        assert_eq!(next_index(0, 3), 1);
+        assert_eq!(prev_index(0, 3), 2);
+        assert_eq!(prev_index(2, 3), 1);
+        assert_eq!(next_index(0, 0), 0);
+        assert_eq!(prev_index(0, 0), 0);
+    }
+
+    #[test]
+    fn gitignore_entries_are_repository_relative() {
+        assert_eq!(
+            normalize_gitignore_entry(" build\\cache ").unwrap(),
+            "build/cache"
+        );
+        assert!(normalize_gitignore_entry("/absolute").is_err());
+        assert!(normalize_gitignore_entry("../outside").is_err());
+        assert!(normalize_gitignore_entry("bad\nentry").is_err());
+        assert!(normalize_gitignore_entry("# comment").is_err());
     }
 }
